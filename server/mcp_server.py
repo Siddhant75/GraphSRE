@@ -525,16 +525,23 @@ async def graphsre_execute_remediation_step(
 
     if raw and len(raw) > 1 and len(raw[1]) > 0:
         row = raw[1][0]
-        plan_id = row[0]
-        exec_state = row[1]
-        incident_state = row[2]
+        return {
+            "status": "CANARY_ACTIVE",
+            "dry_run": dry_run,
+            "sandbox_id": sandbox_id,
+            "plan_id": row[0],
+            "execution_state": row[1],
+            "incident_state": row[2]
+        }
 
     return {
+        "status": "ERROR",
+        "error": f"Failed to execute remediation step: Incident '{incident_id}' or Hypothesis '{hypothesis_id}' not found.",
+        "incident_id": incident_id,
+        "hypothesis_id": hypothesis_id,
         "dry_run": dry_run,
         "sandbox_id": sandbox_id,
-        "plan_id": plan_id,
-        "execution_state": exec_state,
-        "incident_state": incident_state
+        "raw": raw
     }
 
 
@@ -616,9 +623,10 @@ async def decay_stale_shortcut_edges() -> int:
     """Maintenance query applying continuous temporal decay to idle shortcut edges."""
     query = """
     MATCH ()-[r:CAUSED_BY_SHORTCUT]->()
-    WHERE r.last_seen < (timestamp() - 86400000)
-    WITH r, (timestamp() - r.last_seen) / 1000.0 AS elapsed_sec
-    SET r.weight = r.weight * exp(-0.00000026734 * elapsed_sec)
+    WHERE coalesce(r.last_decayed, r.last_seen) < (timestamp() - 86400000)
+    WITH r, (timestamp() - coalesce(r.last_decayed, r.last_seen)) / 1000.0 AS elapsed_sec
+    SET r.weight = r.weight * exp(-0.00000026734 * elapsed_sec),
+        r.last_decayed = timestamp()
     RETURN count(r) AS edges_updated;
     """
     raw = await db_client.execute_query(query)

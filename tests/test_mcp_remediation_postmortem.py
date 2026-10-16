@@ -185,6 +185,33 @@ async def test_decay_and_pruning_empty_results():
         assert prune_res == 0
 
 
+@pytest.mark.asyncio
+async def test_remediation_missing_node_returns_error():
+    """Verify graphsre_execute_remediation_step returns structured error when incident or hypothesis does not exist."""
+    with patch("server.mcp_server.db_client.create_sandbox", new_callable=AsyncMock) as mock_sandbox, \
+         patch("server.mcp_server.db_client.execute_query", new_callable=AsyncMock) as mock_exec:
+
+        mock_sandbox.return_value = "sandbox_inc_missing"
+        mock_exec.return_value = [["header"], []]
+
+        result = await graphsre_execute_remediation_step(
+            incident_id="inc_missing",
+            hypothesis_id="hyp_missing",
+            action_type="POD_DRAIN",
+            target_entity="PaymentService",
+            command_payload="kubectl drain node-1",
+            rollback_payload="kubectl uncordon node-1",
+            dry_run=True,
+        )
+
+        assert result["status"] == "ERROR"
+        assert "not found" in result["error"]
+        assert result["incident_id"] == "inc_missing"
+        assert result["hypothesis_id"] == "hyp_missing"
+        assert result["dry_run"] is True
+        assert result["sandbox_id"] == "sandbox_inc_missing"
+
+
 if __name__ == "__main__":
     def run_coroutine(coro):
         """Drive coroutine chain directly without blocking on Windows sandbox loopback pipes."""
@@ -239,4 +266,8 @@ if __name__ == "__main__":
     run_coroutine(test_decay_and_pruning_empty_results())
     print("PASS: test_decay_and_pruning_empty_results")
 
-    print("\nAll 6 MCP remediation and postmortem tests passed successfully!")
+    print("Running test_remediation_missing_node_returns_error...")
+    run_coroutine(test_remediation_missing_node_returns_error())
+    print("PASS: test_remediation_missing_node_returns_error")
+
+    print("\nAll 7 MCP remediation and postmortem tests passed successfully!")
