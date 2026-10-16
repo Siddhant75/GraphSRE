@@ -265,5 +265,194 @@ async def graphsre_traverse_causal_path(
     return {"incident_id": incident_id, "culprits": culprits}
 
 
+@mcp.tool()
+async def graphsre_query_memory(
+    incident_id: str,
+    hypothesis_id: str,
+    service_name: str,
+    query_vector: List[float],
+    metric_snr: float,
+    top_k: int = 3
+) -> Dict[str, Any]:
+    """
+    Tool 3: Hybrid Retrieval across HNSW Vector memory, topological structural reachability,
+    and procedural runbook graphs. Computes Composite Confidence C_SRE.
+    """
+    query = """
+    CALL db.idx.vector.queryNodes('PastIncident', 'embedding', $top_k, vecf32($query_vector))
+    YIELD node AS past_incident, score AS episodic_sim
+    MATCH (past_incident)-[:AFFECTED_SERVICE]->(s:Service {name: $service_name})
+    OPTIONAL MATCH (past_incident)-[:RESOLVED_BY_PLAYBOOK]->(rb:Runbook)
+    MATCH (h:Hypothesis {id: $hypothesis_id})-[:TARGETS]->(culprit_target)
+
+    WITH h, past_incident, episodic_sim, rb, s, culprit_target
+    OPTIONAL MATCH path = (s)-[:EXPOSES]->(:Endpoint)-[:IMPLEMENTED_BY]->(root_fn:Function)-[:CALLS*0..4]->(suspect_fn:Function)
+    WHERE suspect_fn = culprit_target OR (suspect_fn)-[:MODIFIED_BY]->(culprit_target)
+    WITH h, past_incident, episodic_sim, rb,
+         (CASE WHEN count(path) > 0 THEN 1.0 ELSE 0.0 END) AS t_graph,
+         coalesce(rb.success_rate, 0.70) AS h_success,
+         $metric_snr AS e_metric
+
+    WITH h, past_incident, episodic_sim, rb, t_graph, e_metric, h_success,
+         ((0.25 * episodic_sim) + (0.35 * t_graph) + (0.25 * e_metric) + (0.15 * h_success)) AS c_sre
+
+    SET h.composite_confidence = c_sre
+
+    RETURN past_incident.id AS prior_incident_id,
+           past_incident.root_cause_summary AS past_summary,
+           past_incident.resolution AS past_resolution,
+           episodic_sim,
+           rb.id AS suggested_runbook_id,
+           rb.title AS playbook_title,
+           c_sre AS composite_confidence;
+    """
+    params = {
+        "incident_id": incident_id,
+        "hypothesis_id": hypothesis_id,
+        "service_name": service_name,
+        "query_vector": query_vector,
+        "metric_snr": metric_snr,
+        "top_k": top_k
+    }
+    raw = await db_client.execute_query(query, params)
+
+    matches = []
+    if raw and len(raw) > 1 and raw[1]:
+        for row in raw[1]:
+            matches.append({
+                "prior_incident_id": row[0],
+                "past_summary": row[1],
+                "past_resolution": row[2],
+                "episodic_sim": row[3],
+                "suggested_runbook_id": row[4],
+                "playbook_title": row[5],
+                "composite_confidence": row[6]
+            })
+    return {"incident_id": incident_id, "hypothesis_id": hypothesis_id, "matches": matches}
+
+
+@mcp.tool()
+async def graphsre_post_hypothesis(
+    incident_id: str,
+    agent_id: str,
+    statement: str,
+    target_commit_sha: str,
+    initial_confidence: float,
+    evidence_items: List[Dict[str, Any]]
+) -> Dict[str, Any]:
+    """
+    Tool 4: Atomic Hypothesis creation, evidence attachment, confidence validation,
+    and FSM state transition to HYPOTHESIS_FORMED.
+    """
+    query = """
+    MATCH (i:Incident {id: $incident_id})
+    MATCH (c:Commit {sha: $target_commit_sha})
+    CREATE (h:Hypothesis {
+        id: 'hyp_' + randomUUID(),
+        agent_id: $agent_id,
+        statement: $statement,
+        composite_confidence: $initial_confidence,
+        status: 'PROPOSED',
+        created_at: timestamp()
+    })
+    CREATE (i)-[:HAS_HYPOTHESIS]->(h)
+    CREATE (h)-[:TARGETS]->(c)
+
+    WITH h, i
+    UNWIND $evidence_items AS ev
+    CREATE (e:Evidence {
+        id: 'ev_' + randomUUID(),
+        type: ev.evidence_type,
+        source: ev.source,
+        payload: ev.payload,
+        confidence_score: ev.confidence,
+        timestamp: timestamp()
+    })
+    CREATE (h)-[:SUPPORTED_BY {weight: ev.confidence}]->(e)
+
+    WITH i, h, count(e) AS attached_count
+    SET i.state = 'HYPOTHESIS_FORMED'
+    RETURN h.id AS hypothesis_id, h.status AS status, attached_count;
+    """
+    params = {
+        "incident_id": incident_id,
+        "agent_id": agent_id,
+        "statement": statement,
+        "target_commit_sha": target_commit_sha,
+        "initial_confidence": initial_confidence,
+        "evidence_items": evidence_items
+    }
+    raw = await db_client.execute_query(query, params)
+
+    if raw and len(raw) > 1 and len(raw[1]) > 0:
+        row = raw[1][0]
+        return {
+            "hypothesis_id": row[0],
+            "status": row[1],
+            "attached_count": row[2]
+        }
+    return {"status": "HYPOTHESIS_POSTED", "raw": raw}
+
+
+@mcp.tool()
+async def graphsre_get_blackboard_state(incident_id: str) -> Dict[str, Any]:
+    """
+    Tool 5: Reads full incident subgraph including lifecycle state, severity, active alerts,
+    hypotheses, attached evidence, and consensus votes.
+    """
+    query = """
+    MATCH (i:Incident {id: $incident_id})
+    OPTIONAL MATCH (i)-[:HAS_ALERT]->(a:Alert)
+    WITH i, collect(DISTINCT {
+        id: a.id,
+        name: a.name,
+        metric_value: a.metric_value,
+        threshold: a.threshold,
+        timestamp: a.timestamp
+    }) AS alerts
+
+    OPTIONAL MATCH (i)-[:HAS_HYPOTHESIS]->(h:Hypothesis)
+    OPTIONAL MATCH (h)-[:SUPPORTED_BY]->(e:Evidence)
+    OPTIONAL MATCH (voter)-[v:VOTED_ON]->(h)
+    WITH i, alerts, h,
+         count(DISTINCT e) AS evidence_count,
+         collect(DISTINCT {type: e.type, confidence: e.confidence_score}) AS evidence_samples,
+         collect(DISTINCT {voter: coalesce(voter.name, voter.id, voter.agent_id), decision: v.decision, weight: v.weight, reason: v.reasoning}) AS votes
+
+    WITH i, alerts, collect(DISTINCT {
+        hypothesis_id: h.id,
+        statement: h.statement,
+        status: h.status,
+        confidence: h.composite_confidence,
+        evidence_count: evidence_count,
+        evidence_samples: evidence_samples,
+        votes: votes
+    }) AS hypotheses
+
+    RETURN i.id AS incident_id,
+           i.state AS lifecycle_state,
+           i.severity AS severity,
+           i.blast_radius_count AS blast_radius,
+           i.started_at AS started_at,
+           alerts,
+           hypotheses;
+    """
+    raw = await db_client.execute_query(query, {"incident_id": incident_id})
+
+    if raw and len(raw) > 1 and len(raw[1]) > 0:
+        row = raw[1][0]
+        return {
+            "incident_id": row[0],
+            "lifecycle_state": row[1],
+            "severity": row[2],
+            "blast_radius": row[3],
+            "started_at": row[4],
+            "alerts": row[5],
+            "hypotheses": row[6]
+        }
+    return {"incident_id": incident_id, "blackboard": raw}
+
+
 if __name__ == "__main__":
     mcp.run(transport="stdio")
+
