@@ -1,16 +1,20 @@
 import React from 'react';
 import TopologyCanvas from '@/components/TopologyCanvas';
 import AgentFeed from '@/components/AgentFeed';
+import QuorumMeter from '@/components/QuorumMeter';
+import ActionCard from '@/components/ActionCard';
+import ChaosPanel from '@/components/ChaosPanel';
+import ShortcutVisualizer from '@/components/ShortcutVisualizer';
 
 export default function WarRoomPage() {
   return (
     <div className="space-y-6">
-      {/* Top Status Bar */}
+      {/* Top Status & Quorum Row */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-[#0F172A] border border-[#1E293B] rounded-xl p-4">
           <span className="text-xs text-gray-400 font-mono">Incident ID</span>
           <h3 className="text-lg font-bold text-white mt-1 font-mono">inc_98a12c</h3>
-          <span className="text-[11px] text-emerald-400">State: INVESTIGATING</span>
+          <span className="text-[11px] text-emerald-400 font-medium">State: INVESTIGATING</span>
         </div>
         <div className="bg-[#0F172A] border border-red-500/30 rounded-xl p-4">
           <span className="text-xs text-red-400 font-semibold font-mono">Dynamic Severity</span>
@@ -18,18 +22,14 @@ export default function WarRoomPage() {
           <span className="text-[11px] text-gray-400">PageRank: 0.884 | Tier: 1</span>
         </div>
         <div className="bg-[#0F172A] border border-[#1E293B] rounded-xl p-4">
-          <span className="text-xs text-gray-400 font-mono">Upstream Blast Radius</span>
+          <span className="text-xs text-gray-400 font-mono">Blast Radius</span>
           <h3 className="text-lg font-bold text-white mt-1">3 Microservices</h3>
-          <span className="text-[11px] text-gray-400">CartService, Checkout, FrontendAPI</span>
+          <span className="text-[11px] text-gray-400">Cart, Checkout, FrontendAPI</span>
         </div>
-        <div className="bg-[#0F172A] border border-emerald-500/30 rounded-xl p-4">
-          <span className="text-xs text-emerald-400 font-mono">Quorum Consensus</span>
-          <h3 className="text-lg font-bold text-emerald-400 mt-1 font-mono">0.88 / 0.75</h3>
-          <span className="text-[11px] text-emerald-300">Quorum Reached (3/3 Agents)</span>
-        </div>
+        <QuorumMeter />
       </div>
 
-      {/* Main Graph & Live Feed Grid */}
+      {/* Main Grid: Cytoscape Canvas on Left (2 cols), Live Deliberation Feed on Right (1 col) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
           <TopologyCanvas />
@@ -38,6 +38,19 @@ export default function WarRoomPage() {
           <AgentFeed />
         </div>
       </div>
+
+      {/* Human-in-the-Loop Action Card & Shortcut Visualizer */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <ActionCard />
+        </div>
+        <div className="lg:col-span-1">
+          <ShortcutVisualizer />
+        </div>
+      </div>
+
+      {/* Chaos Injection Controller */}
+      <ChaosPanel />
     </div>
   );
 }
