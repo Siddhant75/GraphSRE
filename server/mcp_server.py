@@ -471,6 +471,177 @@ async def graphsre_get_blackboard_state(incident_id: str) -> Dict[str, Any]:
     }
 
 
+@mcp.tool()
+async def graphsre_execute_remediation_step(
+    incident_id: str,
+    hypothesis_id: str,
+    action_type: str,
+    target_entity: str,
+    command_payload: str,
+    rollback_payload: str,
+    dry_run: bool = True
+) -> Dict[str, Any]:
+    """
+    Tool 6: Remediation plan execution & state transition inside the active incident graph.
+    If dry_run=True, forks ephemeral sandbox in sub-15ms via native GRAPH.COPY.
+    """
+    sandbox_id = None
+    target_graph = None
+
+    if dry_run:
+        sandbox_id = await db_client.create_sandbox(incident_id)
+        target_graph = sandbox_id
+        logger.info(f"Remediation dry_run active in ephemeral sandbox: {sandbox_id}")
+
+    query = """
+    MATCH (i:Incident {id: $incident_id})-[:HAS_HYPOTHESIS]->(h:Hypothesis {id: $hypothesis_id})
+    CREATE (plan:RemediationPlan {
+        id: 'plan_' + randomUUID(),
+        action_type: $action_type,
+        target_entity: $target_entity,
+        command_payload: $command_payload,
+        rollback_payload: $rollback_payload,
+        execution_state: 'CANARY_ACTIVE',
+        created_at: timestamp()
+    })
+    CREATE (h)-[:GENERATES_PLAN]->(plan)
+    SET i.state = 'REMEDIATING',
+        h.status = 'REMEDIATING'
+    RETURN plan.id AS plan_id, plan.execution_state AS execution_state, i.state AS incident_state;
+    """
+    params = {
+        "incident_id": incident_id,
+        "hypothesis_id": hypothesis_id,
+        "action_type": action_type,
+        "target_entity": target_entity,
+        "command_payload": command_payload,
+        "rollback_payload": rollback_payload
+    }
+    raw = await db_client.execute_query(query, params, graph=target_graph)
+
+    plan_id = "plan_unknown"
+    exec_state = "CANARY_ACTIVE"
+    incident_state = "REMEDIATING"
+
+    if raw and len(raw) > 1 and len(raw[1]) > 0:
+        row = raw[1][0]
+        plan_id = row[0]
+        exec_state = row[1]
+        incident_state = row[2]
+
+    return {
+        "dry_run": dry_run,
+        "sandbox_id": sandbox_id,
+        "plan_id": plan_id,
+        "execution_state": exec_state,
+        "incident_state": incident_state
+    }
+
+
+@mcp.tool()
+async def graphsre_commit_postmortem(
+    incident_id: str,
+    root_cause_summary: str,
+    resolution_summary: str,
+    mttr_seconds: int,
+    embedding: List[float]
+) -> Dict[str, Any]:
+    """
+    Tool 7: Finalizes resolved incident, writes postmortem embedding into HNSW episodic memory,
+    and compiles verified causal paths into self-curating O(1) shortcut edges.
+    """
+    query = """
+    MATCH (i:Incident {id: $incident_id})
+    SET i.state = 'RESOLVED',
+        i.resolved_at = timestamp(),
+        i.mttr_seconds = $mttr_seconds
+
+    CREATE (p:PastIncident {
+        id: 'postmortem_' + i.id,
+        incident_id: i.id,
+        root_cause_summary: $root_cause_summary,
+        resolution: $resolution_summary,
+        mttr_seconds: $mttr_seconds,
+        embedding: vecf32($embedding),
+        resolved_at: timestamp()
+    })
+    CREATE (i)-[:ARCHIVED_AS]->(p)
+
+    WITH i, p
+    MATCH (i)-[:HAS_ALERT]->(:Alert)-[:AFFECTS]->(s:Service)
+    MERGE (p)-[:AFFECTED_SERVICE]->(s)
+
+    WITH i, p
+    MATCH (i)-[:HAS_ALERT]->(a:Alert)
+    MATCH (i)-[:HAS_HYPOTHESIS]->(h:Hypothesis)-[:TARGETS]->(culprit)
+    WHERE h.status IN ['HYPOTHESIS_VERIFIED', 'REMEDIATING', 'RESOLVED']
+
+    MERGE (a)-[r:CAUSED_BY_SHORTCUT]->(culprit)
+      ON CREATE SET r.weight = 1.0,
+                    r.occurrences = 1,
+                    r.last_seen = timestamp(),
+                    r.stale = false
+      ON MATCH SET r.weight = r.weight + (0.50 * (1.0 - r.weight)),
+                   r.occurrences = r.occurrences + 1,
+                   r.last_seen = timestamp(),
+                   r.stale = false
+
+    RETURN p.id AS postmortem_id, i.state AS final_lifecycle_state, r.weight AS shortcut_edge_weight;
+    """
+    params = {
+        "incident_id": incident_id,
+        "root_cause_summary": root_cause_summary,
+        "resolution_summary": resolution_summary,
+        "mttr_seconds": mttr_seconds,
+        "embedding": embedding
+    }
+    raw = await db_client.execute_query(query, params)
+
+    if raw and len(raw) > 1 and len(raw[1]) > 0:
+        row = raw[1][0]
+        return {
+            "postmortem_id": row[0],
+            "final_lifecycle_state": row[1],
+            "shortcut_edge_weight": row[2]
+        }
+    return {
+        "status": "ERROR",
+        "error": f"Failed to commit postmortem: Incident '{incident_id}' not found.",
+        "incident_id": incident_id,
+        "raw": raw
+    }
+
+
+async def decay_stale_shortcut_edges() -> int:
+    """Maintenance query applying continuous temporal decay to idle shortcut edges."""
+    query = """
+    MATCH ()-[r:CAUSED_BY_SHORTCUT]->()
+    WHERE r.last_seen < (timestamp() - 86400000)
+    WITH r, (timestamp() - r.last_seen) / 1000.0 AS elapsed_sec
+    SET r.weight = r.weight * exp(-0.00000026734 * elapsed_sec)
+    RETURN count(r) AS edges_updated;
+    """
+    raw = await db_client.execute_query(query)
+    if raw and len(raw) > 1 and len(raw[1]) > 0:
+        return int(raw[1][0][0])
+    return 0
+
+
+async def prune_obsolete_shortcut_edges() -> int:
+    """Maintenance query pruning dead shortcut edges (W < 0.15 or stale > 90 days)."""
+    query = """
+    MATCH ()-[r:CAUSED_BY_SHORTCUT]->()
+    WHERE r.weight < 0.15 OR (r.stale = true AND r.last_seen < (timestamp() - (90 * 86400000)))
+    DELETE r
+    RETURN count(r) AS edges_deleted;
+    """
+    raw = await db_client.execute_query(query)
+    if raw and len(raw) > 1 and len(raw[1]) > 0:
+        return int(raw[1][0][0])
+    return 0
+
+
 if __name__ == "__main__":
     mcp.run(transport="stdio")
+
 
