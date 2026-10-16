@@ -108,6 +108,51 @@ async def test_graphsre_traverse_causal_path_execution():
         assert params["time_window_hours"] == 6
 
 
+@pytest.mark.asyncio
+async def test_graphsre_triage_alert_missing_service_returns_error():
+    """Verify graphsre_triage_alert returns structured error when target service does not exist in graph."""
+    mock_db_result = [
+        ["incident_id", "severity", "blast_radius", "impacted_services", "sev_score"],
+        []
+    ]
+    with patch("server.mcp_server.db_client.execute_query", new_callable=AsyncMock) as mock_exec:
+        mock_exec.return_value = mock_db_result
+
+        result = await graphsre_triage_alert(
+            alert_id="alt_404",
+            fingerprint="fp_missing",
+            alert_name="NonExistentService_Down",
+            source="Datadog",
+            target_service="GhostService",
+            metric_value=100.0,
+            threshold=50.0,
+            timestamp=1718900000000
+        )
+
+        assert result["status"] == "ERROR"
+        assert "not found" in result["error"]
+
+
+@pytest.mark.asyncio
+async def test_graphsre_traverse_causal_path_clamps_bounds():
+    """Verify graphsre_traverse_causal_path clamps max_depth to [1, 6] and time_window_hours >= 1."""
+    with patch("server.mcp_server.db_client.execute_query", new_callable=AsyncMock) as mock_exec:
+        mock_exec.return_value = [["header"], []]
+
+        result = await graphsre_traverse_causal_path(
+            incident_id="inc_clamp",
+            service_name="PaymentService",
+            max_depth=99,
+            time_window_hours=-10
+        )
+
+        args, kwargs = mock_exec.call_args
+        params = args[1]
+        assert params["max_depth"] == 6
+        assert params["time_window_hours"] == 1
+        assert result["culprits"] == []
+
+
 if __name__ == "__main__":
     def run_coroutine(coro):
         """Drive coroutine chain directly without blocking on Windows sandbox loopback pipes."""
@@ -146,5 +191,14 @@ if __name__ == "__main__":
     run_coroutine(test_graphsre_traverse_causal_path_execution())
     print("PASS: test_graphsre_traverse_causal_path_execution")
 
-    print("\nAll MCP triage and traversal tests passed successfully!")
+    print("Running test_graphsre_triage_alert_missing_service_returns_error...")
+    run_coroutine(test_graphsre_triage_alert_missing_service_returns_error())
+    print("PASS: test_graphsre_triage_alert_missing_service_returns_error")
+
+    print("Running test_graphsre_traverse_causal_path_clamps_bounds...")
+    run_coroutine(test_graphsre_traverse_causal_path_clamps_bounds())
+    print("PASS: test_graphsre_traverse_causal_path_clamps_bounds")
+
+    print("\nAll 4 MCP triage and traversal tests passed successfully!")
+
 
