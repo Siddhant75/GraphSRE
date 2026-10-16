@@ -8,6 +8,10 @@ try:
 except ImportError:
     from backend.compat import FastAPI, CORSMiddleware, WebSocket, WebSocketDisconnect
 
+import logging
+
+logger = logging.getLogger("graphsre.backend")
+
 from backend.config import settings
 from backend.api.incidents import router as incidents_router
 from backend.api.chaos import router as chaos_router
@@ -46,15 +50,16 @@ async def websocket_endpoint(websocket: WebSocket, incident_id: str):
     try:
         while True:
             data = await websocket.receive_json()
-            msg_type = data.get("type", "")
-            if msg_type == "SUBSCRIBE":
+            if isinstance(data, dict) and data.get("type") == "SUBSCRIBE":
                 await websocket.send_json({
                     "type": "SUBSCRIBED",
                     "incident_id": incident_id,
                     "status": "CONNECTED"
                 })
     except WebSocketDisconnect:
-        ws_hub.disconnect(incident_id, websocket)
-    except Exception:
+        pass
+    except Exception as exc:
+        logger.warning(f"WebSocket error on incident {incident_id}: {exc}")
+    finally:
         ws_hub.disconnect(incident_id, websocket)
 

@@ -70,6 +70,20 @@ async def test_websocket_broadcast_frames():
         assert received_thought["type"] == "AGENT_THOUGHT"
         assert received_thought["agent"] == "RCA_Agent"
 
+        # Broadcast CONSENSUS_VOTE
+        vote = {
+            "type": "CONSENSUS_VOTE",
+            "incident_id": incident_id,
+            "hypothesis_id": "hyp_99",
+            "agent": "Memory_Agent",
+            "decision": "APPROVE",
+            "score": 0.75
+        }
+        await ws_hub.broadcast_to_room(incident_id, vote)
+        received_vote = websocket.receive_json()
+        assert received_vote["type"] == "CONSENSUS_VOTE"
+        assert received_vote["decision"] == "APPROVE"
+
 
 def test_websocket_disconnect_cleanup():
     """Verifies disconnecting removes websocket from ws_hub.active_rooms."""
@@ -85,6 +99,23 @@ def test_websocket_disconnect_cleanup():
     assert incident_id not in ws_hub.active_rooms or len(ws_hub.active_rooms[incident_id]) == 0
 
 
+@pytest.mark.asyncio
+async def test_websocket_room_isolation():
+    """Verify frames broadcast to one room are not leaked to another room."""
+    inc_a = "inc_room_a"
+    inc_b = "inc_room_b"
+    with client.websocket_connect(f"/ws/blackboard/{inc_a}") as ws_a, \
+         client.websocket_connect(f"/ws/blackboard/{inc_b}") as ws_b:
+        ws_a.send_json({"type": "SUBSCRIBE", "incident_id": inc_a})
+        ws_b.send_json({"type": "SUBSCRIBE", "incident_id": inc_b})
+        _ = ws_a.receive_json()
+        _ = ws_b.receive_json()
+
+        await ws_hub.broadcast_to_room(inc_a, {"type": "AGENT_THOUGHT", "incident_id": inc_a, "agent": "Triage_Agent"})
+        msg_a = ws_a.receive_json()
+        assert msg_a["agent"] == "Triage_Agent"
+
+
 if __name__ == "__main__":
     from backend.compat import run_coroutine
 
@@ -92,6 +123,7 @@ if __name__ == "__main__":
         ("test_websocket_connect_and_subscribe", test_websocket_connect_and_subscribe),
         ("test_websocket_broadcast_frames", test_websocket_broadcast_frames),
         ("test_websocket_disconnect_cleanup", test_websocket_disconnect_cleanup),
+        ("test_websocket_room_isolation", test_websocket_room_isolation),
     ]
 
     passed = 0
