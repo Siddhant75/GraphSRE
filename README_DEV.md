@@ -9,17 +9,18 @@ GraphSRE enforces a **Zero Local Docker Build** architecture to conserve develop
 Run the full production stack using pre-built cloud images from Docker Hub (`sid7899999`):
 
 ```bash
-docker-compose up -d
+docker compose up -d
+# or: docker-compose up -d
 ```
 
 This immediately pulls and boots:
 - `falkordb/falkordb:latest` on port `6379`
-- `sid7899999/graphsre-backend:latest` on port `8000` (FastAPI REST + WebSockets + FastMCP)
+- `sid7899999/graphsre-backend:latest` on port `8000` (FastAPI REST & WebSockets) and port `8001` (FastMCP)
 - `sid7899999/graphsre-frontend:latest` on port `3000` (Next.js 14 Cytoscape.js War Room)
 
 To shut down:
 ```bash
-docker-compose down
+docker compose down
 ```
 
 ---
@@ -38,6 +39,9 @@ docker run -d --name graphsre-falkordb -p 6379:6379 falkordb/falkordb:latest
 # Create and activate virtual environment
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Initialize local environment variables
+cp .env.example .env       # On Windows PowerShell: Copy-Item .env.example .env
 
 # Install dependencies
 pip install -r requirements.txt
