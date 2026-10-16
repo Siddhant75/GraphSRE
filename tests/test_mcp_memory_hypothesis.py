@@ -191,6 +191,65 @@ async def test_graphsre_query_memory_empty_results():
         assert result["matches"] == []
 
 
+@pytest.mark.asyncio
+async def test_graphsre_post_hypothesis_missing_node_returns_error():
+    """Verify graphsre_post_hypothesis returns structured error when incident or commit does not exist."""
+    with patch("server.mcp_server.db_client.execute_query", new_callable=AsyncMock) as mock_exec:
+        mock_exec.return_value = [["header"], []]
+
+        result = await graphsre_post_hypothesis(
+            incident_id="inc_missing",
+            agent_id="RCA_Agent",
+            statement="Missing incident test",
+            target_commit_sha="c3d9a107",
+            initial_confidence=0.8,
+            evidence_items=[]
+        )
+
+        assert result["status"] == "ERROR"
+        assert "not found" in result["error"]
+
+
+@pytest.mark.asyncio
+async def test_graphsre_get_blackboard_state_missing_incident_returns_error():
+    """Verify graphsre_get_blackboard_state returns structured error when incident does not exist."""
+    with patch("server.mcp_server.db_client.execute_query", new_callable=AsyncMock) as mock_exec:
+        mock_exec.return_value = [["header"], []]
+
+        result = await graphsre_get_blackboard_state("inc_ghost")
+
+        assert result["status"] == "ERROR"
+        assert "not found" in result["error"]
+        assert result["incident_id"] == "inc_ghost"
+
+
+@pytest.mark.asyncio
+async def test_graphsre_get_blackboard_state_filters_phantom_nulls():
+    """Verify graphsre_get_blackboard_state filters out phantom null entries caused by empty OPTIONAL MATCH maps."""
+    mock_snapshot = [
+        ["incident_id", "lifecycle_state", "severity", "blast_radius", "started_at", "alerts", "hypotheses"],
+        [
+            [
+                "inc_empty_subgraph",
+                "DETECTED",
+                "SEV_3",
+                0,
+                1718900000000,
+                [{"id": None, "name": None, "metric_value": None}],
+                [{"hypothesis_id": None, "statement": None}]
+            ]
+        ]
+    ]
+    with patch("server.mcp_server.db_client.execute_query", new_callable=AsyncMock) as mock_exec:
+        mock_exec.return_value = mock_snapshot
+
+        bb = await graphsre_get_blackboard_state("inc_empty_subgraph")
+
+        assert bb["incident_id"] == "inc_empty_subgraph"
+        assert bb["alerts"] == []
+        assert bb["hypotheses"] == []
+
+
 if __name__ == "__main__":
     def run_coroutine(coro):
         """Drive coroutine chain directly without blocking on Windows sandbox loopback pipes."""
@@ -237,4 +296,17 @@ if __name__ == "__main__":
     run_coroutine(test_graphsre_query_memory_empty_results())
     print("PASS: test_graphsre_query_memory_empty_results")
 
-    print("\nAll 4 MCP memory and hypothesis tests passed successfully!")
+    print("Running test_graphsre_post_hypothesis_missing_node_returns_error...")
+    run_coroutine(test_graphsre_post_hypothesis_missing_node_returns_error())
+    print("PASS: test_graphsre_post_hypothesis_missing_node_returns_error")
+
+    print("Running test_graphsre_get_blackboard_state_missing_incident_returns_error...")
+    run_coroutine(test_graphsre_get_blackboard_state_missing_incident_returns_error())
+    print("PASS: test_graphsre_get_blackboard_state_missing_incident_returns_error")
+
+    print("Running test_graphsre_get_blackboard_state_filters_phantom_nulls...")
+    run_coroutine(test_graphsre_get_blackboard_state_filters_phantom_nulls())
+    print("PASS: test_graphsre_get_blackboard_state_filters_phantom_nulls")
+
+    print("\nAll 7 MCP memory and hypothesis tests passed successfully!")
+

@@ -306,13 +306,14 @@ async def graphsre_query_memory(
            rb.title AS playbook_title,
            c_sre AS composite_confidence;
     """
+    effective_top_k = max(1, min(int(top_k), 20))
     params = {
         "incident_id": incident_id,
         "hypothesis_id": hypothesis_id,
         "service_name": service_name,
         "query_vector": query_vector,
         "metric_snr": metric_snr,
-        "top_k": top_k
+        "top_k": effective_top_k
     }
     raw = await db_client.execute_query(query, params)
 
@@ -391,7 +392,11 @@ async def graphsre_post_hypothesis(
             "status": row[1],
             "attached_count": row[2]
         }
-    return {"status": "HYPOTHESIS_POSTED", "raw": raw}
+    return {
+        "status": "ERROR",
+        "error": f"Failed to post hypothesis: Incident '{incident_id}' or Commit '{target_commit_sha}' not found.",
+        "raw": raw
+    }
 
 
 @mcp.tool()
@@ -441,16 +446,29 @@ async def graphsre_get_blackboard_state(incident_id: str) -> Dict[str, Any]:
 
     if raw and len(raw) > 1 and len(raw[1]) > 0:
         row = raw[1][0]
+        alerts = [
+            a for a in row[5]
+            if isinstance(a, dict) and any(v is not None for v in a.values())
+        ]
+        hypotheses = [
+            h for h in row[6]
+            if isinstance(h, dict) and any(v is not None for v in h.values())
+        ]
         return {
             "incident_id": row[0],
             "lifecycle_state": row[1],
             "severity": row[2],
             "blast_radius": row[3],
             "started_at": row[4],
-            "alerts": row[5],
-            "hypotheses": row[6]
+            "alerts": alerts,
+            "hypotheses": hypotheses
         }
-    return {"incident_id": incident_id, "blackboard": raw}
+    return {
+        "status": "ERROR",
+        "error": f"Incident '{incident_id}' not found on blackboard.",
+        "incident_id": incident_id,
+        "raw": raw
+    }
 
 
 if __name__ == "__main__":
