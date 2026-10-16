@@ -519,10 +519,6 @@ async def graphsre_execute_remediation_step(
     }
     raw = await db_client.execute_query(query, params, graph=target_graph)
 
-    plan_id = "plan_unknown"
-    exec_state = "CANARY_ACTIVE"
-    incident_state = "REMEDIATING"
-
     if raw and len(raw) > 1 and len(raw[1]) > 0:
         row = raw[1][0]
         return {
@@ -587,10 +583,12 @@ async def graphsre_commit_postmortem(
       ON CREATE SET r.weight = 1.0,
                     r.occurrences = 1,
                     r.last_seen = timestamp(),
+                    r.last_decayed = timestamp(),
                     r.stale = false
       ON MATCH SET r.weight = r.weight + (0.50 * (1.0 - r.weight)),
                    r.occurrences = r.occurrences + 1,
                    r.last_seen = timestamp(),
+                   r.last_decayed = timestamp(),
                    r.stale = false
 
     RETURN p.id AS postmortem_id, i.state AS final_lifecycle_state, r.weight AS shortcut_edge_weight;
