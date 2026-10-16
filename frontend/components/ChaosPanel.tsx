@@ -96,7 +96,13 @@ export default function ChaosPanel() {
       </div>
 
       {lastResult && (
-        <div className="mt-3 text-xs flex items-center space-x-1.5 text-emerald-400 font-mono">
+        <div
+          className={`mt-3 text-xs flex items-center space-x-1.5 font-mono ${
+            lastResult.includes('fallback') || lastResult.includes('mock')
+              ? 'text-amber-400'
+              : 'text-emerald-400'
+          }`}
+        >
           <CheckCircle2 className="w-3.5 h-3.5" />
           <span>{lastResult}</span>
         </div>

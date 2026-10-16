@@ -5,7 +5,7 @@ import { AlertOctagon, Check, Play, ShieldCheck, Undo2 } from 'lucide-react';
 export default function ActionCard() {
   const [reverted, setReverted] = useState(false);
   const [forkSimulating, setForkSimulating] = useState(false);
-  const [simulationPassed, setSimulationPassed] = useState(true);
+  const [simulationPassed, setSimulationPassed] = useState(false);
 
   const handleSimulateSandbox = () => {
     setForkSimulating(true);

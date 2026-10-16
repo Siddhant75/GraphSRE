@@ -5,8 +5,9 @@ import { Scale } from 'lucide-react';
 
 export default function QuorumMeter() {
   const { wcs } = useBlackboardStore();
-  const percentage = Math.min(100, Math.round((wcs / 1.0) * 100));
-  const quorumReached = wcs >= 0.75;
+  const safeWcs = typeof wcs === 'number' ? Math.max(0, Math.min(1.0, wcs)) : 0;
+  const percentage = Math.min(100, Math.round(safeWcs * 100));
+  const quorumReached = safeWcs >= 0.75;
 
   return (
     <div className="bg-[#0F172A] border border-[#1E293B] rounded-xl p-4 flex flex-col justify-between">
@@ -16,7 +17,7 @@ export default function QuorumMeter() {
           <span className="text-xs text-gray-400 font-mono">Consensus Quorum (WCS)</span>
         </div>
         <span className={`text-xs font-bold font-mono ${quorumReached ? 'text-emerald-400' : 'text-amber-400'}`}>
-          {wcs.toFixed(2)} / 0.75 threshold
+          {safeWcs.toFixed(2)} / 0.75 threshold
         </span>
       </div>
 
