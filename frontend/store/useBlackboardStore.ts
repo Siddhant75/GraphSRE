@@ -68,13 +68,13 @@ export const useBlackboardStore = create<BlackboardState>((set, get) => ({
     { data: { id: "commit_c3d9", label: "c3d9a107 (Alice Chen)", type: "Commit", author: "Alice Chen", sha: "c3d9a107" } },
 
     // Edges
-    { data: { source: "svc_frontend", target: "svc_checkout", label: "CALLS" } },
-    { data: { source: "svc_checkout", target: "svc_payment", label: "DEPENDS_ON" } },
-    { data: { source: "alt_p99", target: "svc_payment", label: "AFFECTS" } },
-    { data: { source: "svc_payment", target: "ep_charge", label: "EXPOSES" } },
-    { data: { source: "ep_charge", target: "fn_stripe", label: "IMPLEMENTED_BY", is_causal_path: "true" } },
-    { data: { source: "fn_stripe", target: "commit_c3d9", label: "MODIFIED_BY", is_causal_path: "true" } },
-    { data: { source: "alt_p99", target: "fn_stripe", label: "CAUSED_BY_SHORTCUT", type: "CAUSED_BY_SHORTCUT" } }
+    { data: { id: "svc_frontend_CALLS_svc_checkout", source: "svc_frontend", target: "svc_checkout", label: "CALLS" } },
+    { data: { id: "svc_checkout_DEPENDS_ON_svc_payment", source: "svc_checkout", target: "svc_payment", label: "DEPENDS_ON" } },
+    { data: { id: "alt_p99_AFFECTS_svc_payment", source: "alt_p99", target: "svc_payment", label: "AFFECTS" } },
+    { data: { id: "svc_payment_EXPOSES_ep_charge", source: "svc_payment", target: "ep_charge", label: "EXPOSES" } },
+    { data: { id: "ep_charge_IMPLEMENTED_BY_fn_stripe", source: "ep_charge", target: "fn_stripe", label: "IMPLEMENTED_BY", is_causal_path: "true" } },
+    { data: { id: "fn_stripe_MODIFIED_BY_commit_c3d9", source: "fn_stripe", target: "commit_c3d9", label: "MODIFIED_BY", is_causal_path: "true" } },
+    { data: { id: "alt_p99_SHORTCUT_fn_stripe", source: "alt_p99", target: "fn_stripe", label: "CAUSED_BY_SHORTCUT", type: "CAUSED_BY_SHORTCUT" } }
   ],
   selectedNode: null,
 
@@ -96,7 +96,18 @@ export const useBlackboardStore = create<BlackboardState>((set, get) => ({
     }
     if (delta.edges_added) {
       for (const edge of delta.edges_added) {
-        updatedElements.push({ data: { source: edge.source, target: edge.target, label: edge.label, ...edge.properties } });
+        const edgeId = edge.id || `${edge.source}_${edge.label}_${edge.target}`;
+        if (!updatedElements.some(e => e.data && (e.data.id === edgeId || (e.data.source === edge.source && e.data.target === edge.target && e.data.label === edge.label)))) {
+          updatedElements.push({
+            data: {
+              id: edgeId,
+              source: edge.source,
+              target: edge.target,
+              label: edge.label,
+              ...edge.properties
+            }
+          });
+        }
       }
     }
     return { elements: updatedElements };
@@ -115,6 +126,10 @@ export const useBlackboardStore = create<BlackboardState>((set, get) => ({
         ws.send(JSON.stringify({ type: 'SUBSCRIBE', incident_id: incidentId }));
       };
       ws.onclose = () => get().setWsConnected(false);
+      ws.onerror = (e) => {
+        // Clean WebSocket error suppression in local dev mock mode
+        console.warn("WebSocket error (mock/offline mode):", e);
+      };
       ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);

@@ -1,5 +1,6 @@
 import React from 'react';
 import TopologyCanvas from '@/components/TopologyCanvas';
+import AgentFeed from '@/components/AgentFeed';
 
 export default function WarRoomPage() {
   return (
@@ -28,13 +29,13 @@ export default function WarRoomPage() {
         </div>
       </div>
 
-      {/* Main Graph & Feed Placeholder Grid */}
+      {/* Main Graph & Live Feed Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
           <TopologyCanvas />
         </div>
-        <div className="lg:col-span-1 bg-[#0F172A] border border-[#1E293B] rounded-xl p-6 min-h-[600px] flex items-center justify-center text-gray-400">
-          Agent Blackboard Live Feed Placeholder
+        <div className="lg:col-span-1">
+          <AgentFeed />
         </div>
       </div>
     </div>
