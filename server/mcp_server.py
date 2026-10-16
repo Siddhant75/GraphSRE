@@ -72,8 +72,9 @@ def compute_sev_score(tier: str, pagerank: float, in_degree: int) -> float:
     Computes Topology-Weighted Dynamic Severity Score:
     SevScore = 40*TierWeight + 35*PageRank + 25*NormalizedInDegree
     """
-    tier_weight = 1.0 if tier == "TIER_1" else (0.6 if tier == "TIER_2" else 0.3)
-    normalized_indegree = 1.0 if in_degree >= 5 else (in_degree / 5.0)
+    tier_upper = tier.upper() if isinstance(tier, str) else ""
+    tier_weight = 1.0 if tier_upper == "TIER_1" else (0.6 if tier_upper == "TIER_2" else 0.3)
+    normalized_indegree = max(0.0, min(1.0, float(in_degree) / 5.0))
     return (40.0 * tier_weight) + (35.0 * pagerank) + (25.0 * normalized_indegree)
 
 
