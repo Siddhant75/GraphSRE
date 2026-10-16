@@ -81,7 +81,7 @@ export const useBlackboardStore = create<BlackboardState>((set, get) => ({
   setIncidentId: (id) => set({ incidentId: id }),
   setWsConnected: (connected) => set({ wsConnected: connected }),
   setSelectedNode: (node) => set({ selectedNode: node }),
-  addAgentThought: (thought) => set((s) => ({ agentThoughts: [thought, ...s.agentThoughts] })),
+  addAgentThought: (thought) => set((s) => ({ agentThoughts: [thought, ...s.agentThoughts].slice(0, 100) })),
   updateConsensus: (wcs) => set({ wcs }),
   updateLifecycleState: (state) => set({ lifecycleState: state }),
 
@@ -116,7 +116,7 @@ export const useBlackboardStore = create<BlackboardState>((set, get) => ({
   initializeWebSocket: (incidentId: string) => {
     if (typeof window === 'undefined') return () => {};
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.hostname}:8000/ws/blackboard/${incidentId}`;
+    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || `${protocol}//${window.location.hostname}:8000/ws/blackboard/${incidentId}`;
     let ws: WebSocket;
 
     try {
@@ -134,17 +134,18 @@ export const useBlackboardStore = create<BlackboardState>((set, get) => ({
         try {
           const msg = JSON.parse(event.data);
           if (msg.type === 'AGENT_THOUGHT') {
+            const rawAgent = (msg.agent || 'Remediation').replace(/_Agent$/i, '');
             get().addAgentThought({
-              agent: msg.agent,
-              text: msg.text,
+              agent: rawAgent as AgentThought['agent'],
+              text: msg.text || msg.thought || '',
               timestamp: msg.timestamp || Date.now(),
               cypher_query: msg.cypher_query,
-              confidence: msg.confidence
+              confidence: msg.confidence ?? msg.score
             });
           } else if (msg.type === 'CONSENSUS_VOTE') {
-            get().updateConsensus(msg.wcs);
+            get().updateConsensus(msg.wcs ?? msg.score ?? 0);
           } else if (msg.type === 'STATE_CHANGE') {
-            get().updateLifecycleState(msg.to);
+            get().updateLifecycleState(msg.to || msg.state);
           } else if (msg.type === 'GRAPH_MUTATION' && msg.delta) {
             get().reconcileGraphMutation(msg.delta);
           }

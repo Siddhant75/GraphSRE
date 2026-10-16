@@ -29,7 +29,7 @@ export default function AgentFeed() {
 
       <div className="flex-1 overflow-y-auto space-y-3 pr-1">
         {agentThoughts.map((thought, idx) => (
-          <AgentThoughtCard key={idx} thought={thought} />
+          <AgentThoughtCard key={`${thought.agent}-${thought.timestamp}-${idx}`} thought={thought} />
         ))}
       </div>
     </div>

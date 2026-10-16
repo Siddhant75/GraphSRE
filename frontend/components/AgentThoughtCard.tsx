@@ -51,7 +51,7 @@ export default function AgentThoughtCard({ thought }: Props) {
           {style.icon}
           <span className={`font-semibold text-xs ${style.text}`}>{thought.agent} Agent</span>
         </div>
-        <span className="text-[10px] text-gray-500 font-mono">
+        <span className="text-[10px] text-gray-500 font-mono" suppressHydrationWarning>
           {new Date(thought.timestamp).toLocaleTimeString()}
         </span>
       </div>
