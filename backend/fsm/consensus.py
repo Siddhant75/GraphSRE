@@ -21,8 +21,9 @@ class QuorumConsensusEngine:
         veto_reasons: List[str] = []
 
         for v in votes:
-            decision = str(v.get("decision", "")).upper()
-            weight = float(v.get("weight", 0.0))
+            decision = str(v.get("decision", "")).strip().upper()
+            raw_weight = v.get("weight")
+            weight = float(raw_weight) if raw_weight is not None else 0.0
             reasoning = v.get("reasoning", "")
             agent_id = v.get("agent_id", "UnknownAgent")
 
@@ -36,7 +37,7 @@ class QuorumConsensusEngine:
                 has_veto = True
                 veto_reasons.append(f"Explicit veto cast by {agent_id}: {reasoning}")
 
-        quorum_reached = (wcs >= 0.75) and not has_veto
+        quorum_reached = (round(wcs, 4) >= 0.75) and not has_veto
         status = "HYPOTHESIS_VERIFIED" if quorum_reached else ("REJECTED_BY_VETO" if has_veto else "PENDING_CONSENSUS")
 
         return {

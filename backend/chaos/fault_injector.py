@@ -2,6 +2,7 @@
 Chaos Engineering Fault Simulator
 File: backend/chaos/fault_injector.py
 """
+import hashlib
 import time
 from typing import Dict, Any
 
@@ -18,9 +19,10 @@ class ChaosFaultInjector:
 
     def create_socket_timeout_payload(self, service: str = "PaymentService") -> Dict[str, Any]:
         """Creates an unbounded HTTP socket read timeout fault alert."""
+        fp = hashlib.sha256(f"{service}_SocketReadTimeout".encode()).hexdigest()[:12]
         return {
             "alert_id": f"alt_chaos_socket_{int(time.time())}",
-            "fingerprint": "a8f3b9c02d1e",
+            "fingerprint": fp,
             "alert_name": f"{service}_SocketReadTimeout",
             "source": "Prometheus",
             "target_service": service,
@@ -31,9 +33,10 @@ class ChaosFaultInjector:
 
     def create_connection_exhaustion_payload(self, service: str = "PaymentService") -> Dict[str, Any]:
         """Creates a database connection pool exhaustion fault alert."""
+        fp = hashlib.sha256(f"{service}_DBConnectionPoolExhausted".encode()).hexdigest()[:12]
         return {
             "alert_id": f"alt_chaos_db_{int(time.time())}",
-            "fingerprint": "b7c2a1098e4f",
+            "fingerprint": fp,
             "alert_name": f"{service}_DBConnectionPoolExhausted",
             "source": "Prometheus",
             "target_service": service,
@@ -44,9 +47,10 @@ class ChaosFaultInjector:
 
     def create_latency_spike_payload(self, service: str = "CheckoutService") -> Dict[str, Any]:
         """Creates a p99 latency degradation fault alert."""
+        fp = hashlib.sha256(f"{service}_HighLatencyP99".encode()).hexdigest()[:12]
         return {
             "alert_id": f"alt_chaos_lat_{int(time.time())}",
-            "fingerprint": "c1f4e892d3b5",
+            "fingerprint": fp,
             "alert_name": f"{service}_HighLatencyP99",
             "source": "Prometheus",
             "target_service": service,
