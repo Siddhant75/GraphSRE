@@ -35,6 +35,8 @@ jobs:
           tags: |
             sid7899999/graphsre-backend:latest
             sid7899999/graphsre-backend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Build and Push Frontend Image
         uses: docker/build-push-action@v5
@@ -45,3 +47,5 @@ jobs:
           tags: |
             sid7899999/graphsre-frontend:latest
             sid7899999/graphsre-frontend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
