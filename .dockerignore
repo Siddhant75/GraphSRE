@@ -1,0 +1,11 @@
+node_modules
+.next
+__pycache__
+*.pyc
+.git
+.venv
+.env
+dist
+build
+.coverage
+htmlcov
