@@ -17,6 +17,7 @@ from backend.models import (
     QuorumVoteResponse,
     SimulateRemediationRequest
 )
+from backend.fsm.consensus import QuorumConsensusEngine
 from server.falkordb_client import FalkorDBClient
 
 router = APIRouter(prefix="/api/incidents", tags=["incidents"])
@@ -110,23 +111,27 @@ async def get_blackboard(incident_id: str):
     query = """
     MATCH (i:Incident {id: $incident_id})
     OPTIONAL MATCH (i)-[:HAS_ALERT]->(a:Alert)
-    WITH i, collect(DISTINCT {
+    WITH i, collect(DISTINCT (CASE WHEN a IS NOT NULL THEN {
         id: a.id,
         name: a.name,
         metric_value: a.metric_value,
         threshold: a.threshold,
         timestamp: a.timestamp
-    }) AS alerts
+    } ELSE null END)) AS raw_alerts
+    WITH i, [a_item IN raw_alerts WHERE a_item IS NOT NULL] AS alerts
 
     OPTIONAL MATCH (i)-[:HAS_HYPOTHESIS]->(h:Hypothesis)
     OPTIONAL MATCH (h)-[:SUPPORTED_BY]->(e:Evidence)
     OPTIONAL MATCH (voter)-[v:VOTED_ON]->(h)
     WITH i, alerts, h,
          count(DISTINCT e) AS evidence_count,
-         collect(DISTINCT {type: e.type, confidence: e.confidence_score}) AS evidence_samples,
-         collect(DISTINCT {voter: coalesce(voter.name, voter.id, voter.agent_id), decision: v.decision, weight: v.weight, reason: v.reasoning}) AS votes
+         collect(DISTINCT (CASE WHEN e IS NOT NULL THEN {type: e.type, confidence: e.confidence_score} ELSE null END)) AS raw_evidence,
+         collect(DISTINCT (CASE WHEN v IS NOT NULL THEN {voter: coalesce(voter.name, voter.id, voter.agent_id), decision: v.decision, weight: v.weight, reason: v.reasoning} ELSE null END)) AS raw_votes
+    WITH i, alerts, h, evidence_count,
+         [e_item IN raw_evidence WHERE e_item IS NOT NULL] AS evidence_samples,
+         [v_item IN raw_votes WHERE v_item IS NOT NULL] AS votes
 
-    WITH i, alerts, collect(DISTINCT {
+    WITH i, alerts, collect(DISTINCT (CASE WHEN h IS NOT NULL THEN {
         hypothesis_id: h.id,
         statement: h.statement,
         status: h.status,
@@ -134,7 +139,8 @@ async def get_blackboard(incident_id: str):
         evidence_count: evidence_count,
         evidence_samples: evidence_samples,
         votes: votes
-    }) AS hypotheses
+    } ELSE null END)) AS raw_hypotheses
+    WITH i, alerts, [h_item IN raw_hypotheses WHERE h_item IS NOT NULL] AS hypotheses
 
     RETURN i.id AS incident_id,
            i.state AS lifecycle_state,
@@ -147,14 +153,16 @@ async def get_blackboard(incident_id: str):
     raw = await db_client.execute_query(query, {"incident_id": incident_id})
     if raw and len(raw) > 1 and len(raw[1]) > 0:
         row = raw[1][0]
+        alerts = [item for item in (row[5] or []) if isinstance(item, dict) and any(v is not None for v in item.values())]
+        hypotheses = [item for item in (row[6] or []) if isinstance(item, dict) and any(v is not None for v in item.values())]
         return {
             "incident_id": row[0],
             "lifecycle_state": row[1],
             "severity": row[2],
             "blast_radius": row[3],
             "started_at": row[4],
-            "alerts": row[5],
-            "hypotheses": row[6]
+            "alerts": alerts,
+            "hypotheses": hypotheses
         }
     return {
         "incident_id": incident_id,
@@ -228,24 +236,14 @@ async def cast_consensus_vote(incident_id: str, req: QuorumVoteRequest):
         {"agent_id": req.agent_id, "decision": req.decision, "weight": req.weight, "reasoning": req.reasoning}
     ]
 
-    wcs = 0.0
-    has_veto = False
-    for v in votes:
-        if v["decision"] == "APPROVE":
-            wcs += v["weight"]
-        elif v["decision"] in ["REJECT", "VETO"]:
-            if v["weight"] >= 0.35 or v["decision"] == "VETO":
-                has_veto = True
-
-    quorum_reached = (wcs >= 0.75) and not has_veto
-    status = "HYPOTHESIS_VERIFIED" if quorum_reached else ("REJECTED" if has_veto else "INVESTIGATING")
+    quorum_res = QuorumConsensusEngine.evaluate_quorum(votes)
 
     return QuorumVoteResponse(
         hypothesis_id=req.hypothesis_id,
-        weighted_consensus_score=round(wcs, 3),
-        quorum_reached=quorum_reached,
-        status=status,
-        votes=votes
+        weighted_consensus_score=quorum_res["weighted_consensus_score"],
+        quorum_reached=quorum_res["quorum_reached"],
+        status=quorum_res["status"],
+        votes=quorum_res["votes"]
     )
 
 
