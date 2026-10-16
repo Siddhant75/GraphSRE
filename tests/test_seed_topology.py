@@ -29,7 +29,13 @@ except ImportError:
 
     pytest = _PytestMock()
 
-from scripts.seed_mock_topology import generate_normalized_embedding, get_seed_cypher
+from unittest.mock import MagicMock, patch
+from scripts.seed_mock_topology import (
+    generate_normalized_embedding,
+    get_seed_cypher,
+    get_past_incident_cypher,
+    seed_database,
+)
 
 
 def test_generate_normalized_embedding_length_and_unit_norm():
@@ -86,6 +92,43 @@ def test_seed_cypher_teams_engineers_runbooks():
     assert "rb_net_042" in cypher
 
 
+def test_get_past_incident_cypher():
+    """Verify get_past_incident_cypher creates PastIncident, vector embedding, and relationships."""
+    cypher = get_past_incident_cypher()
+    assert "PastIncident" in cypher
+    assert "postmortem_inc_historical_01" in cypher
+    assert "vecf32($vec)" in cypher
+    assert "AFFECTED_SERVICE" in cypher
+    assert "RESOLVED_BY_PLAYBOOK" in cypher
+    assert "svc_payment" in cypher
+    assert "rb_net_042" in cypher
+
+
+def test_seed_database_execution_flow_with_mock():
+    """Verify seed_database performs expected initialization, indexing, and query calls."""
+    mock_redis_client = MagicMock()
+    mock_redis_client.ping.return_value = True
+
+    with patch("scripts.seed_mock_topology.redis") as mock_redis_mod:
+        mock_redis_mod.Redis.return_value = mock_redis_client
+        success = seed_database(host="mockhost", port=6379, graph="test_graph")
+        assert success is True
+        mock_redis_client.ping.assert_called_once()
+        # Verify commands were executed on the graph
+        assert mock_redis_client.execute_command.call_count >= 3
+
+
+def test_seed_database_handles_offline_falkordb():
+    """Verify seed_database returns False gracefully when FalkorDB is unreachable."""
+    mock_redis_client = MagicMock()
+    mock_redis_client.ping.side_effect = ConnectionError("Could not connect")
+
+    with patch("scripts.seed_mock_topology.redis") as mock_redis_mod:
+        mock_redis_mod.Redis.return_value = mock_redis_client
+        success = seed_database(host="offlinehost", port=6379, graph="test_graph")
+        assert success is False
+
+
 if __name__ == "__main__":
     print("Running test_generate_normalized_embedding_length_and_unit_norm...")
     test_generate_normalized_embedding_length_and_unit_norm()
@@ -103,4 +146,16 @@ if __name__ == "__main__":
     test_seed_cypher_teams_engineers_runbooks()
     print("PASS: test_seed_cypher_teams_engineers_runbooks")
 
-    print("\nAll 4 topology seed tests passed successfully!")
+    print("Running test_get_past_incident_cypher...")
+    test_get_past_incident_cypher()
+    print("PASS: test_get_past_incident_cypher")
+
+    print("Running test_seed_database_execution_flow_with_mock...")
+    test_seed_database_execution_flow_with_mock()
+    print("PASS: test_seed_database_execution_flow_with_mock")
+
+    print("Running test_seed_database_handles_offline_falkordb...")
+    test_seed_database_handles_offline_falkordb()
+    print("PASS: test_seed_database_handles_offline_falkordb")
+
+    print("\nAll 7 topology seed tests passed successfully!")

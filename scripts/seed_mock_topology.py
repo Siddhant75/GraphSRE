@@ -116,66 +116,9 @@ def get_seed_cypher() -> str:
     """
 
 
-def seed_database(
-    host: Optional[str] = None,
-    port: Optional[int] = None,
-    graph: Optional[str] = None,
-) -> bool:
-    """
-    Connect to FalkorDB, create HNSW vector indices, populate graph topology,
-    and insert vector-indexed historical postmortems.
-    Handles exceptions gracefully if FalkorDB is not running or redis is unavailable.
-    """
-    if redis is None:
-        print("Warning: redis package is not installed. Skipping FalkorDB connection.")
-        return False
-
-    falkor_host = host or os.getenv("FALKORDB_HOST", "localhost")
-    falkor_port = int(port or os.getenv("FALKORDB_PORT", 6379))
-    falkor_graph = graph or os.getenv("PRIMARY_GRAPH", "graphsre_production")
-
-    print(f"Connecting to FalkorDB at {falkor_host}:{falkor_port} (Graph: {falkor_graph})...")
-    try:
-        r = redis.Redis(host=falkor_host, port=falkor_port, decode_responses=True)
-        r.ping()
-    except Exception as e:
-        print(f"Warning: Could not connect to FalkorDB at {falkor_host}:{falkor_port}: {e}")
-        return False
-
-    # 1. Initialize HNSW Vector Indices
-    print("Creating HNSW Vector Indices in FalkorDB...")
-    try:
-        r.execute_command(
-            "GRAPH.QUERY",
-            falkor_graph,
-            "CALL db.idx.vector.createNodeIndex('PastIncident', 'embedding', 384, 'cosine')",
-        )
-        print("Created vector index on PastIncident.embedding")
-    except Exception as e:
-        print(f"Notice: PastIncident vector index already exists or notice: {e}")
-
-    try:
-        r.execute_command(
-            "GRAPH.QUERY",
-            falkor_graph,
-            "CALL db.idx.vector.createNodeIndex('Runbook', 'embedding', 384, 'cosine')",
-        )
-        print("Created vector index on Runbook.embedding")
-    except Exception as e:
-        print(f"Notice: Runbook vector index already exists or notice: {e}")
-
-    # 2. Seed Graph Topology
-    print("Seeding Microservices, AST Call Graph, Commits & Teams...")
-    try:
-        r.execute_command("GRAPH.QUERY", falkor_graph, get_seed_cypher())
-    except Exception as e:
-        print(f"Error seeding graph topology: {e}")
-        return False
-
-    # 3. Seed Past Incident Postmortem with 384-dim vecf32 Vector
-    print("Seeding Episodic Memory Historical Postmortems with vecf32 embeddings...")
-    embedding = generate_normalized_embedding(384)
-    past_incident_cypher = """
+def get_past_incident_cypher() -> str:
+    """Returns the OpenCypher query to create historical vector-indexed postmortem and relationships."""
+    return """
     CREATE (p:PastIncident {
         id: 'postmortem_inc_historical_01',
         incident_id: 'inc_historical_01',
@@ -191,19 +134,97 @@ def seed_database(
     MERGE (p)-[:AFFECTED_SERVICE]->(s)
     MERGE (p)-[:RESOLVED_BY_PLAYBOOK]->(rb)
     """
-    try:
-        r.execute_command(
-            "GRAPH.QUERY",
-            falkor_graph,
-            past_incident_cypher,
-            "--params",
-            json.dumps({"vec": embedding}),
-        )
-        print("Graph topology and vector-indexed postmortems seeded successfully.")
-        return True
-    except Exception as e:
-        print(f"Error seeding postmortem: {e}")
+
+
+def seed_database(
+    host: Optional[str] = None,
+    port: Optional[int] = None,
+    graph: Optional[str] = None,
+) -> bool:
+    """
+    Connect to FalkorDB, create HNSW vector indices, populate graph topology,
+    and insert vector-indexed historical postmortems.
+    Handles exceptions gracefully if FalkorDB is not running or redis is unavailable.
+    """
+    if redis is None:
+        logger.warning("redis package is not installed. Skipping FalkorDB connection.")
+        print("Warning: redis package is not installed. Skipping FalkorDB connection.")
         return False
+
+    falkor_host = host or os.getenv("FALKORDB_HOST", "localhost")
+    falkor_port = int(port or os.getenv("FALKORDB_PORT", 6379))
+    falkor_graph = graph or os.getenv("PRIMARY_GRAPH", "graphsre_production")
+
+    logger.info(f"Connecting to FalkorDB at {falkor_host}:{falkor_port} (Graph: {falkor_graph})...")
+    print(f"Connecting to FalkorDB at {falkor_host}:{falkor_port} (Graph: {falkor_graph})...")
+    try:
+        r = redis.Redis(host=falkor_host, port=falkor_port, decode_responses=True)
+        r.ping()
+    except Exception as e:
+        logger.warning(f"Could not connect to FalkorDB at {falkor_host}:{falkor_port}: {e}")
+        print(f"Warning: Could not connect to FalkorDB at {falkor_host}:{falkor_port}: {e}")
+        return False
+
+    try:
+        # 1. Initialize HNSW Vector Indices (supports native FalkorDB DDL and legacy procedure)
+        print("Creating HNSW Vector Indices in FalkorDB...")
+        for label, prop, ddl_query, proc_query in [
+            (
+                "PastIncident",
+                "embedding",
+                "CREATE VECTOR INDEX FOR (p:PastIncident) ON (p.embedding) OPTIONS {dimension: 384, similarityFunction: 'cosine'}",
+                "CALL db.idx.vector.createNodeIndex('PastIncident', 'embedding', 384, 'cosine')",
+            ),
+            (
+                "Runbook",
+                "embedding",
+                "CREATE VECTOR INDEX FOR (r:Runbook) ON (r.embedding) OPTIONS {dimension: 384, similarityFunction: 'cosine'}",
+                "CALL db.idx.vector.createNodeIndex('Runbook', 'embedding', 384, 'cosine')",
+            ),
+        ]:
+            try:
+                r.execute_command("GRAPH.QUERY", falkor_graph, ddl_query)
+                logger.info(f"Created vector index on {label}.{prop} via native DDL")
+            except Exception:
+                try:
+                    r.execute_command("GRAPH.QUERY", falkor_graph, proc_query)
+                    logger.info(f"Created vector index on {label}.{prop} via procedure")
+                except Exception as ex:
+                    logger.info(f"Notice: {label} vector index creation: {ex}")
+
+        # 2. Seed Graph Topology
+        print("Seeding Microservices, AST Call Graph, Commits & Teams...")
+        try:
+            r.execute_command("GRAPH.QUERY", falkor_graph, get_seed_cypher())
+            logger.info("Topology Cypher seeded successfully")
+        except Exception as e:
+            logger.error(f"Error seeding graph topology: {e}")
+            print(f"Error seeding graph topology: {e}")
+            return False
+
+        # 3. Seed Past Incident Postmortem with 384-dim vecf32 Vector
+        print("Seeding Episodic Memory Historical Postmortems with vecf32 embeddings...")
+        embedding = generate_normalized_embedding(384)
+        try:
+            r.execute_command(
+                "GRAPH.QUERY",
+                falkor_graph,
+                get_past_incident_cypher(),
+                "--params",
+                json.dumps({"vec": embedding}),
+            )
+            logger.info("Graph topology and vector-indexed postmortems seeded successfully.")
+            print("Graph topology and vector-indexed postmortems seeded successfully.")
+            return True
+        except Exception as e:
+            logger.error(f"Error seeding postmortem: {e}")
+            print(f"Error seeding postmortem: {e}")
+            return False
+    finally:
+        try:
+            r.close()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":
