@@ -134,6 +134,10 @@ class FalkorDBClient:
         Returns:
             True if deleted successfully, False otherwise.
         """
+        if sandbox_graph == self.default_graph:
+            logger.error(f"Safety guardrail: Refusing to delete default production graph '{sandbox_graph}'.")
+            raise ValueError(f"Safety guardrail: Refusing to delete default production graph '{sandbox_graph}'.")
+
         client = await self.get_client()
         try:
             await client.execute_command("GRAPH.DELETE", sandbox_graph)

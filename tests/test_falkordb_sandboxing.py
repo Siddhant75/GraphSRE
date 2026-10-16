@@ -129,6 +129,15 @@ async def test_destroy_sandbox_handles_error_gracefully():
     assert success is False
 
 
+@pytest.mark.asyncio
+async def test_destroy_sandbox_guardrail_prevents_deleting_default_graph():
+    """Verify destroy_sandbox raises ValueError if attempting to delete the default graph."""
+    client = FalkorDBClient(default_graph="graphsre_production")
+    with pytest.raises(ValueError) as exc:
+        await client.destroy_sandbox("graphsre_production")
+    assert "Safety guardrail" in str(exc.value)
+
+
 if __name__ == "__main__":
     def run_coroutine(coro):
         """Drive coroutine chain directly without blocking on Windows sandbox loopback pipes."""
@@ -179,4 +188,8 @@ if __name__ == "__main__":
     run_coroutine(test_destroy_sandbox_handles_error_gracefully())
     print("PASS: test_destroy_sandbox_handles_error_gracefully")
 
-    print("\nAll 5 tests passed successfully!")
+    print("Running test_destroy_sandbox_guardrail_prevents_deleting_default_graph...")
+    run_coroutine(test_destroy_sandbox_guardrail_prevents_deleting_default_graph())
+    print("PASS: test_destroy_sandbox_guardrail_prevents_deleting_default_graph")
+
+    print("\nAll 6 sandboxing tests passed successfully!")
