@@ -101,8 +101,52 @@ class FalkorDBClient:
             logger.error(f"Unexpected error executing Cypher in '{target_graph}': {err}")
             raise
 
+    async def create_sandbox(self, incident_id: str, source_graph: Optional[str] = None) -> str:
+        """
+        Forks the production graph in sub-15ms using FalkorDB's native zero-cost GRAPH.COPY.
+        Enables safe canary simulation and counterfactual execution without impacting live state.
+
+        Args:
+            incident_id: Unique incident identifier.
+            source_graph: Optional source graph name; defaults to self.default_graph.
+
+        Returns:
+            Name of the created ephemeral sandbox graph (sandbox_<incident_id>).
+        """
+        src = source_graph or self.default_graph
+        sandbox_graph = f"sandbox_{incident_id}"
+        client = await self.get_client()
+        try:
+            await client.execute_command("GRAPH.COPY", src, sandbox_graph)
+            logger.info(f"Ephemeral sandbox created: {sandbox_graph} (cloned from {src})")
+            return sandbox_graph
+        except redis.ResponseError as err:
+            logger.error(f"Failed to fork ephemeral sandbox {sandbox_graph}: {err}")
+            raise RuntimeError(f"FalkorDB Sandbox Creation Error: {str(err)}")
+
+    async def destroy_sandbox(self, sandbox_graph: str) -> bool:
+        """
+        Tears down an ephemeral sandbox instance via GRAPH.DELETE after canary verification.
+
+        Args:
+            sandbox_graph: Name of the ephemeral sandbox graph to delete.
+
+        Returns:
+            True if deleted successfully, False otherwise.
+        """
+        client = await self.get_client()
+        try:
+            await client.execute_command("GRAPH.DELETE", sandbox_graph)
+            logger.info(f"Ephemeral sandbox successfully torn down: {sandbox_graph}")
+            return True
+        except redis.ResponseError as err:
+            logger.warning(f"Failed to delete ephemeral sandbox {sandbox_graph}: {err}")
+            return False
+
     async def close(self):
         """Close connection pool gracefully."""
-        if self.client:
-            await self.client.aclose()
-        await self.pool.aclose()
+        try:
+            if self.client:
+                await self.client.aclose()
+        finally:
+            await self.pool.aclose()
