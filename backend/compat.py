@@ -203,6 +203,13 @@ class APIRouter:
             return fn
         return decorator
 
+    def websocket(self, path: str):
+        def decorator(fn):
+            norm = self._normalize(path)
+            self.routes.append(Route("WEBSOCKET", norm, fn))
+            return fn
+        return decorator
+
 
 class CORSMiddleware:
     def __init__(self, app, **kwargs):
@@ -241,6 +248,13 @@ class FastAPI:
         def decorator(fn):
             norm = "/" + "/".join(p for p in path.split("/") if p)
             self.routes.append(Route("POST", norm, fn, response_model))
+            return fn
+        return decorator
+
+    def websocket(self, path: str):
+        def decorator(fn):
+            norm = "/" + "/".join(p for p in path.split("/") if p)
+            self.routes.append(Route("WEBSOCKET", norm, fn))
             return fn
         return decorator
 
@@ -291,6 +305,140 @@ class FastAPI:
         return {"status_code": 200, "data": data}
 
 
+# ============================================================================
+# WebSocket Fallbacks
+# ============================================================================
+
+class WebSocketDisconnect(Exception):
+    def __init__(self, code: int = 1000, reason: Optional[str] = None):
+        self.code = code
+        self.reason = reason
+        super().__init__(f"WebSocket disconnected with code {code}: {reason}")
+
+
+class _WaitInput:
+    pass
+
+
+class _InputAwaitable:
+    def __init__(self, ws):
+        self.ws = ws
+
+    def __await__(self):
+        while not self.ws.c2s:
+            if self.ws.closed:
+                raise WebSocketDisconnect(1000)
+            yield _WaitInput()
+        return self.ws.c2s.popleft()
+
+
+class WebSocket:
+    def __init__(self, c2s_queue=None, s2c_queue=None):
+        import collections
+        self.c2s = c2s_queue if c2s_queue is not None else collections.deque()
+        self.s2c = s2c_queue if s2c_queue is not None else collections.deque()
+        self.accepted = False
+        self.closed = False
+
+    async def accept(self):
+        self.accepted = True
+
+    async def send_json(self, data: Any):
+        self.s2c.append(data)
+
+    async def send_text(self, text: str):
+        self.s2c.append(text)
+
+    async def receive_json(self) -> Any:
+        return await _InputAwaitable(self)
+
+    async def receive_text(self) -> str:
+        res = await _InputAwaitable(self)
+        return str(res)
+
+    async def close(self, code: int = 1000):
+        self.closed = True
+
+    def __eq__(self, other):
+        return self is other or getattr(other, "server_ws", None) is self
+
+
+class WebSocketTestSession:
+    def __init__(self, app, url: str):
+        self.app = app
+        self.url = url
+        self.server_ws = WebSocket()
+        self.coro = None
+
+    def __enter__(self):
+        clean_url = self.url.split("?")[0]
+        norm = "/" + "/".join(p for p in clean_url.split("/") if p)
+        matched_route = None
+        path_params = {}
+        for r in self.app.routes:
+            params = r.matches("WEBSOCKET", norm)
+            if params is not None:
+                matched_route = r
+                path_params = params
+                break
+
+        if not matched_route:
+            raise RuntimeError(f"No websocket route found matching {self.url}")
+
+        sig = inspect.signature(matched_route.handler)
+        handler_kwargs = {}
+        for param_name, param in sig.parameters.items():
+            if param_name in path_params:
+                handler_kwargs[param_name] = path_params[param_name]
+            elif param_name == "websocket" or param.annotation is WebSocket:
+                handler_kwargs[param_name] = self.server_ws
+            else:
+                handler_kwargs[param_name] = self.server_ws
+
+        self.coro = matched_route.handler(**handler_kwargs)
+        try:
+            self.coro.send(None)
+        except StopIteration:
+            pass
+        return self
+
+    def send_json(self, data: Any):
+        self.server_ws.c2s.append(data)
+        try:
+            self.coro.send(None)
+        except StopIteration:
+            pass
+
+    def send_text(self, text: str):
+        self.send_json(text)
+
+    def receive_json(self) -> Any:
+        if not self.server_ws.s2c:
+            raise RuntimeError(f"WebSocket receive_json called on {self.url} but queue is empty")
+        return self.server_ws.s2c.popleft()
+
+    def receive_text(self) -> str:
+        return str(self.receive_json())
+
+    def close(self, code: int = 1000):
+        if not self.server_ws.closed:
+            self.server_ws.closed = True
+            try:
+                self.coro.throw(WebSocketDisconnect(code))
+            except (StopIteration, WebSocketDisconnect):
+                pass
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+    def __eq__(self, other):
+        return (
+            self is other
+            or self.server_ws is other
+            or (isinstance(other, WebSocketTestSession) and self.server_ws is other.server_ws)
+        )
+
+
 class TestClient:
     def __init__(self, app):
         self.app = app
@@ -302,6 +450,9 @@ class TestClient:
     def post(self, url: str, json: dict = None, **kwargs):
         res = self.app.test_request("POST", url, json_payload=json, **kwargs)
         return FallbackResponse(res.get("status_code", 200), res.get("data", {}))
+
+    def websocket_connect(self, url: str, **kwargs):
+        return WebSocketTestSession(self.app, url)
 
 
 # ============================================================================
@@ -335,6 +486,8 @@ def setup_shims():
             fastapi_mod.FastAPI = FastAPI
             fastapi_mod.APIRouter = APIRouter
             fastapi_mod.HTTPException = HTTPException
+            fastapi_mod.WebSocket = WebSocket
+            fastapi_mod.WebSocketDisconnect = WebSocketDisconnect
 
             # middleware submodule
             mw_mod = types.ModuleType("fastapi.middleware")
@@ -352,6 +505,17 @@ def setup_shims():
             sys.modules["fastapi.testclient"] = tc_mod
 
             sys.modules["fastapi"] = fastapi_mod
+    else:
+        fastapi_mod = sys.modules["fastapi"]
+        if not hasattr(fastapi_mod, "WebSocket"):
+            fastapi_mod.WebSocket = WebSocket
+        if not hasattr(fastapi_mod, "WebSocketDisconnect"):
+            fastapi_mod.WebSocketDisconnect = WebSocketDisconnect
+        if not hasattr(fastapi_mod, "FastAPI"):
+            fastapi_mod.FastAPI = FastAPI
+        if not hasattr(fastapi_mod, "APIRouter"):
+            fastapi_mod.APIRouter = APIRouter
 
 
 setup_shims()
+
