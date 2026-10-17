@@ -1,11 +1,21 @@
 name: Build and Push Docker Images to Docker Hub
 
-'on':
+on:
   push:
     branches:
       - main
       - feat/*
       - fix/*
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'server/**'
+      - 'scripts/**'
+      - 'requirements.txt'
+      - 'docker-compose.yml'
+      - '**/Dockerfile*'
+      - '.dockerignore'
+      - '.github/workflows/docker-build-push.yml'
     tags:
       - 'v*.*.*'
   workflow_dispatch:
