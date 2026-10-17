@@ -24,8 +24,14 @@ class TriageAlertResponse(BaseModel):
     incident_id: str
     severity: str
     blast_radius: int
+    blast_radius_count: Optional[int] = None
     impacted_services: List[str]
     sev_score: float
+
+    def __init__(self, **kwargs):
+        if "blast_radius_count" not in kwargs and "blast_radius" in kwargs:
+            kwargs["blast_radius_count"] = kwargs["blast_radius"]
+        super().__init__(**kwargs)
 
 
 class PostHypothesisRequest(BaseModel):
@@ -47,9 +53,15 @@ class QuorumVoteRequest(BaseModel):
 class QuorumVoteResponse(BaseModel):
     hypothesis_id: str
     weighted_consensus_score: float
+    wcs: Optional[float] = None
     quorum_reached: bool
     status: str
     votes: List[Dict[str, Any]]
+
+    def __init__(self, **kwargs):
+        if "wcs" not in kwargs and "weighted_consensus_score" in kwargs:
+            kwargs["wcs"] = kwargs["weighted_consensus_score"]
+        super().__init__(**kwargs)
 
 
 class SimulateRemediationRequest(BaseModel):
@@ -58,6 +70,21 @@ class SimulateRemediationRequest(BaseModel):
     target_entity: str
     command_payload: str
     rollback_payload: str
+
+
+class RemediateIncidentRequest(BaseModel):
+    action_type: str = Field("CANARY_REVERT", description="Type of mitigation")
+    target_commit: Optional[str] = None
+    target_service: Optional[str] = None
+    simulate_sandbox: bool = True
+
+
+class RemediateIncidentResponse(BaseModel):
+    status: str
+    sandbox_simulation: str
+    shortcut_edge_created: bool
+    incident_id: str
+    plan_id: str
 
 
 class BlastGateRequest(BaseModel):
