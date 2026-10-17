@@ -69,8 +69,7 @@ pnpm-debug.log*
 docs/plans/
 
 # Demo Video Recordings & Media
-demo_video/output/
-demo_video/node_modules/
+demo_video/
 *.webm
 *.mp4
 
