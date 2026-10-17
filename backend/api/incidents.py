@@ -16,7 +16,8 @@ from backend.models import (
     QuorumVoteRequest,
     QuorumVoteResponse,
     SimulateRemediationRequest,
-    RemediateIncidentRequest
+    RemediateIncidentRequest,
+    RemediateIncidentResponse
 )
 from backend.fsm.consensus import QuorumConsensusEngine
 from server.falkordb_client import FalkorDBClient
@@ -296,7 +297,7 @@ async def simulate_remediation(incident_id: str, req: SimulateRemediationRequest
     }
 
 
-@router.post("/{incident_id}/remediate")
+@router.post("/{incident_id}/remediate", response_model=RemediateIncidentResponse)
 async def remediate_incident(incident_id: str, req: RemediateIncidentRequest):
     """
     Executes automated canary rollback and O(1) shortcut synthesis.
@@ -316,7 +317,8 @@ async def remediate_incident(incident_id: str, req: RemediateIncidentRequest):
         i.resolved_at = timestamp()
     WITH i
     OPTIONAL MATCH (i)-[:HAS_ALERT]->(a:Alert)
-    OPTIONAL MATCH (fn:Function {file_path: 'payment/gateway.py'})
+    OPTIONAL MATCH (fn:Function)
+    WHERE fn.file_path CONTAINS coalesce($target_service, 'payment') OR fn.file_path = 'payment/gateway.py'
     FOREACH (_ IN CASE WHEN a IS NOT NULL AND fn IS NOT NULL THEN [1] ELSE [] END |
         MERGE (a)-[r:CAUSED_BY_SHORTCUT]->(fn)
         ON CREATE SET r.weight = 0.90, r.created_at = timestamp(), r.last_seen = timestamp()
@@ -325,14 +327,17 @@ async def remediate_incident(incident_id: str, req: RemediateIncidentRequest):
     RETURN i.id AS incident_id, i.state AS status;
     """
     try:
-        raw = await db_client.execute_query(query, {"incident_id": incident_id})
+        raw = await db_client.execute_query(
+            query,
+            {"incident_id": incident_id, "target_service": (req.target_service or "").lower()}
+        )
     except Exception:
         pass
 
-    return {
-        "status": "RESOLVED",
-        "sandbox_simulation": sandbox_sim,
-        "shortcut_edge_created": True,
-        "incident_id": incident_id,
-        "plan_id": f"plan_{incident_id[-6:]}"
-    }
+    return RemediateIncidentResponse(
+        status="RESOLVED",
+        sandbox_simulation=sandbox_sim,
+        shortcut_edge_created=True,
+        incident_id=incident_id,
+        plan_id=f"plan_{incident_id[-6:]}"
+    )

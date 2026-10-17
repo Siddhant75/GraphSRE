@@ -79,6 +79,14 @@ class RemediateIncidentRequest(BaseModel):
     simulate_sandbox: bool = True
 
 
+class RemediateIncidentResponse(BaseModel):
+    status: str
+    sandbox_simulation: str
+    shortcut_edge_created: bool
+    incident_id: str
+    plan_id: str
+
+
 class BlastGateRequest(BaseModel):
     pr_number: int
     repo_url: str

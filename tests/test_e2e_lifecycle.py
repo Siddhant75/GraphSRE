@@ -99,6 +99,31 @@ def test_full_incident_lifecycle_under_90s_sla():
     total_elapsed_seconds = time.time() - start_time
     assert total_elapsed_seconds < 90.0, f"MTTR violated SLA: took {total_elapsed_seconds}s (limit: 90s)"
 
+    # 5. Phase 9: Second Outage O(1) Shortcut Immediate Resolution (< 2 seconds)
+    second_outage_start = time.time()
+    second_triage = client.post("/api/incidents/triage", json={
+        "alert_id": "alt_test_02",
+        "fingerprint": "fp_socket_timeout_payment",
+        "alert_name": "PaymentService_SocketReadTimeout_High",
+        "target_service": "PaymentService",
+        "metric_value": 4900.0,
+        "threshold": 500.0,
+        "timestamp": int(time.time() * 1000)
+    })
+    assert second_triage.status_code == 200
+    second_incident_id = second_triage.json()["incident_id"]
+
+    second_remed = client.post(f"/api/incidents/{second_incident_id}/remediate", json={
+        "action_type": "CANARY_REVERT",
+        "target_commit": "c3d9a107",
+        "target_service": "PaymentService",
+        "simulate_sandbox": False
+    })
+    assert second_remed.status_code == 200
+    assert second_remed.json()["status"] == "RESOLVED"
+    second_outage_duration = time.time() - second_outage_start
+    assert second_outage_duration < 2.0, f"O(1) Shortcut resolution took {second_outage_duration}s (limit: 2s)"
+
 
 if __name__ == "__main__":
     tests = [
