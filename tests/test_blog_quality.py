@@ -5,12 +5,14 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
-BLOG_PATH = os.path.join(REPO_ROOT, "blog.md")
+BLOG_PATH = os.path.join(REPO_ROOT, "docs", "BLOG_POST.md")
+if not os.path.exists(BLOG_PATH):
+    BLOG_PATH = os.path.join(REPO_ROOT, "blog.md")
 
 
 def test_blog_post_exists_and_meets_rigor_criteria():
-    """Verify blog.md exists, meets length requirement, and includes required technical terminology."""
-    assert os.path.exists(BLOG_PATH), "blog.md must exist for hackathon side prize submission"
+    """Verify blog post draft exists, meets length requirement, and includes required technical terminology."""
+    assert os.path.exists(BLOG_PATH), "docs/BLOG_POST.md must exist for hackathon side prize submission"
     
     with open(BLOG_PATH, "r", encoding="utf-8") as f:
         content = f.read()

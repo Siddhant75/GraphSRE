@@ -44,10 +44,29 @@ htmlcov/
 
 # Environment and Secrets
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 *.pem
 *.key
+*.p12
+*.cert
+*.crt
+*.secret
+*.token
+credentials.json
+id_rsa
+id_ecdsa
+id_ed25519
+
+# Logs & Debug
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Internal Planning & Scratch Files
+docs/plans/
 
 # IDE & OS
 .vscode/

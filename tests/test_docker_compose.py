@@ -64,14 +64,15 @@ def test_docker_compose_zero_build_compliance():
     assert "depends_on" in services["backend"], "Backend service must depend on healthy falkordb"
 
 def test_readme_dev_contains_bare_metal_instructions():
-    """Verify README_DEV.md documents native local dev execution and judge one-liner."""
-    readme_path = "README_DEV.md"
+    """Verify development instructions document native local dev execution and judge one-liner."""
+    dev_doc_path = os.path.join("docs", "DEVELOPMENT.md")
+    readme_path = dev_doc_path if os.path.isfile(dev_doc_path) else "README_DEV.md"
     assert os.path.isfile(readme_path), f"File missing: {readme_path}"
 
     with open(readme_path, "r", encoding="utf-8") as f:
         content = f.read()
 
-    assert "docker-compose up" in content, "README_DEV.md must contain judge one-liner docker-compose up"
+    assert "docker-compose up" in content or "docker compose up" in content, "Dev documentation must contain judge one-liner"
     assert "uvicorn" in content, "README_DEV.md must document running backend natively via uvicorn"
     assert "npm run dev" in content or "pnpm dev" in content, "README_DEV.md must document running frontend dev server"
 
