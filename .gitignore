@@ -68,6 +68,12 @@ pnpm-debug.log*
 # Internal Planning & Scratch Files
 docs/plans/
 
+# Demo Video Recordings & Media
+demo_video/output/
+demo_video/node_modules/
+*.webm
+*.mp4
+
 # IDE & OS
 .vscode/
 .idea/
