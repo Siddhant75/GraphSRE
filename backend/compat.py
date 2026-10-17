@@ -145,6 +145,13 @@ class FallbackResponse:
     def json(self):
         return self._data
 
+    @property
+    def text(self):
+        import json
+        if isinstance(self._data, (dict, list)):
+            return json.dumps(self._data)
+        return str(self._data)
+
 
 class Route:
     def __init__(self, method: str, path: str, handler, response_model=None):

@@ -24,6 +24,10 @@ except ImportError:
             pass
         async def aclose(self):
             pass
+        async def ping(self):
+            return True
+        async def execute_command(self, *args, **kwargs):
+            return []
     redis_mod.ResponseError = ResponseError
     redis_mod.ConnectionPool = ConnectionPool
     redis_mod.Redis = Redis
