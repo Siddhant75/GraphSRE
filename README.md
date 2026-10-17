@@ -48,8 +48,8 @@ To ensure developers and judges with strictly limited disk space experience zero
 ### 1-Click Launch:
 ```bash
 # 1. Clone the repository
-git clone https://github.com/your-username/GraphHacks-hackathon.git
-cd GraphHacks-hackathon
+git clone https://github.com/Siddhant75/GraphSRE.git
+cd GraphSRE
 
 # 2. Pull pre-built images from Docker Hub (0 local build disk space!)
 docker compose pull

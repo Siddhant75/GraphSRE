@@ -681,7 +681,7 @@ GraphSRE proves that when artificial intelligence is grounded in the mathematica
 
 GraphSRE is completely open-source, containerized, and ready for deployment. Experience the zero-build War Room dashboard and autonomous blackboard today:
 
-- 🐙 **GitHub Repository:** [GraphSRE on GitHub](https://github.com/Siddhant75/GraphHacks-hackathon)
+- 🐙 **GitHub Repository:** [GraphSRE on GitHub](https://github.com/Siddhant75/GraphSRE)
 - 🐳 **Docker Hub Images:**
   - Backend (FastAPI + FastMCP + Tree-sitter): `sid7899999/graphsre-backend:latest`
   - Frontend (React 19 + Cytoscape.js War Room): `sid7899999/graphsre-frontend:latest`
