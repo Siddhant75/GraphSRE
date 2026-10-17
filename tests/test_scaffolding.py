@@ -1,5 +1,8 @@
 import os
-import pytest
+try:
+    import pytest
+except ImportError:
+    pytest = None
 
 def test_directory_packages_exist():
     """Verify that backend, server, scripts, and tests directories exist with __init__.py files."""
@@ -64,3 +67,10 @@ def test_gitignore_covers_python_and_node():
     assert "node_modules" in content, "node_modules should be ignored"
     assert ".env" in content, ".env secrets should be ignored"
     assert "__pycache__" in content, "__pycache__ should be ignored"
+
+if __name__ == "__main__":
+    test_directory_packages_exist()
+    test_requirements_file_contains_core_dependencies()
+    test_env_example_has_all_required_variables()
+    test_gitignore_covers_python_and_node()
+    print("All tests in test_scaffolding.py passed.")
