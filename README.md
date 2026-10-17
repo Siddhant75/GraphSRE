@@ -58,7 +58,8 @@ docker compose pull
 docker compose up -d
 
 # 4. Seed FalkorDB with mock topology, AST call trees & vector memory
-python scripts/seed_mock_topology.py
+docker compose exec backend python scripts/seed_mock_topology.py
+# (Or locally: python scripts/seed_mock_topology.py)
 ```
 
 ### Access URLs:

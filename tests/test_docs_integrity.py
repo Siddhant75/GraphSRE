@@ -41,6 +41,7 @@ def test_demo_script_contains_timestamped_acts():
     assert "Act 1" in script, "DEMO_SCRIPT must outline Act 1"
     assert "Act 2" in script, "DEMO_SCRIPT must outline Act 2"
     assert "Act 3" in script, "DEMO_SCRIPT must outline Act 3"
+    assert "Act 4" in script, "DEMO_SCRIPT must outline Act 4"
     assert ("00:00" in script or "0:00" in script), "DEMO_SCRIPT must include start timestamps"
     assert "GRAPH.COPY" in script, "DEMO_SCRIPT must highlight FalkorDB GRAPH.COPY"
 
