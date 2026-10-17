@@ -14,6 +14,8 @@ except ImportError:
             self.rel = rel
         def __eq__(self, actual):
             return abs(actual - self.expected) <= max(self.rel * abs(self.expected), 1e-4)
+        def __repr__(self):
+            return f"approx({self.expected} ± {self.rel})"
     class _PytestMock:
         approx = _PytestApprox
     pytest = _PytestMock()
@@ -66,19 +68,19 @@ def test_bayesian_temporal_exponential_decay():
     decay_lambda = math.log(2) / half_life_seconds
 
     # 1. At t = 0 days -> w = 1.0
-    assert pytest.approx(w_0 * math.exp(-decay_lambda * 0), 0.001) == 1.0
+    assert w_0 * math.exp(-decay_lambda * 0) == pytest.approx(1.0, 0.001)
 
     # 2. At t = 15 days -> w ~ 0.7071
     w_15 = w_0 * math.exp(-decay_lambda * (15 * 86400))
-    assert pytest.approx(w_15, 0.001) == 0.7071
+    assert w_15 == pytest.approx(0.7071, 0.001)
 
     # 3. At t = 30 days (Half-life) -> w = 0.50
     w_30 = w_0 * math.exp(-decay_lambda * (30 * 86400))
-    assert pytest.approx(w_30, 0.001) == 0.50
+    assert w_30 == pytest.approx(0.50, 0.001)
 
     # 4. At t = 60 days (Two half-lives) -> w = 0.25
     w_60 = w_0 * math.exp(-decay_lambda * (60 * 86400))
-    assert pytest.approx(w_60, 0.001) == 0.25
+    assert w_60 == pytest.approx(0.25, 0.001)
 
     # 5. At t = 100 days -> w < 0.10 (threshold for pruning/culling)
     w_100 = w_0 * math.exp(-decay_lambda * (100 * 86400))
