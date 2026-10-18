@@ -6,6 +6,7 @@ Provides 7 atomic Model Context Protocol tools for autonomous SRE agents interac
 with the FalkorDB Central Blackboard.
 """
 import os
+import uuid
 import math
 import logging
 from typing import Any, Dict, List, Optional
@@ -121,10 +122,11 @@ async def graphsre_triage_alert(
     Tool 1: Ingests raw telemetry alert, maps it to affected service, clusters via topology,
     and computes 3-hop upstream blast radius and PageRank SevScore.
     """
+    incident_id = f"inc_{uuid.uuid4().hex[:8]}"
     query = """
     MATCH (s:Service {name: $target_service})
     MERGE (i:Incident {state: 'DETECTED'})
-      ON CREATE SET i.id = 'inc_' + randomUUID(),
+      ON CREATE SET i.id = $incident_id,
                     i.started_at = $timestamp,
                     i.primary_service = s.name,
                     i.composite_confidence = 0.0
@@ -170,6 +172,7 @@ async def graphsre_triage_alert(
            sev_score;
     """
     params = {
+        "incident_id": incident_id,
         "target_service": target_service,
         "timestamp": timestamp,
         "alert_id": alert_id,
@@ -345,11 +348,16 @@ async def graphsre_post_hypothesis(
     Tool 4: Atomic Hypothesis creation, evidence attachment, confidence validation,
     and FSM state transition to HYPOTHESIS_FORMED.
     """
+    hypothesis_id = f"hyp_{uuid.uuid4().hex[:8]}"
+    for ev in evidence_items:
+        if "id" not in ev or not ev["id"]:
+            ev["id"] = f"ev_{uuid.uuid4().hex[:8]}"
+
     query = """
     MATCH (i:Incident {id: $incident_id})
     MATCH (c:Commit {sha: $target_commit_sha})
     CREATE (h:Hypothesis {
-        id: 'hyp_' + randomUUID(),
+        id: $hypothesis_id,
         agent_id: $agent_id,
         statement: $statement,
         composite_confidence: $initial_confidence,
@@ -362,14 +370,14 @@ async def graphsre_post_hypothesis(
     WITH h, i
     UNWIND $evidence_items AS ev
     CREATE (e:Evidence {
-        id: 'ev_' + randomUUID(),
-        type: ev.evidence_type,
+        id: ev.id,
+        type: coalesce(ev.type, ev.evidence_type),
         source: ev.source,
         payload: ev.payload,
-        confidence_score: ev.confidence,
+        confidence_score: coalesce(ev.confidence_score, ev.confidence),
         timestamp: timestamp()
     })
-    CREATE (h)-[:SUPPORTED_BY {weight: ev.confidence}]->(e)
+    CREATE (h)-[:SUPPORTED_BY {weight: coalesce(ev.confidence_score, ev.confidence)}]->(e)
 
     WITH i, h, count(e) AS attached_count
     SET i.state = 'HYPOTHESIS_FORMED'
@@ -381,6 +389,7 @@ async def graphsre_post_hypothesis(
         "statement": statement,
         "target_commit_sha": target_commit_sha,
         "initial_confidence": initial_confidence,
+        "hypothesis_id": hypothesis_id,
         "evidence_items": evidence_items
     }
     raw = await db_client.execute_query(query, params)
@@ -493,10 +502,11 @@ async def graphsre_execute_remediation_step(
         target_graph = sandbox_id
         logger.info(f"Remediation dry_run active in ephemeral sandbox: {sandbox_id}")
 
+    plan_id = f"plan_{uuid.uuid4().hex[:8]}"
     query = """
     MATCH (i:Incident {id: $incident_id})-[:HAS_HYPOTHESIS]->(h:Hypothesis {id: $hypothesis_id})
     CREATE (plan:RemediationPlan {
-        id: 'plan_' + randomUUID(),
+        id: $plan_id,
         action_type: $action_type,
         target_entity: $target_entity,
         command_payload: $command_payload,
@@ -515,7 +525,8 @@ async def graphsre_execute_remediation_step(
         "action_type": action_type,
         "target_entity": target_entity,
         "command_payload": command_payload,
-        "rollback_payload": rollback_payload
+        "rollback_payload": rollback_payload,
+        "plan_id": plan_id
     }
     raw = await db_client.execute_query(query, params, graph=target_graph)
 
@@ -575,7 +586,7 @@ async def graphsre_commit_postmortem(
     MERGE (p)-[:AFFECTED_SERVICE]->(s)
 
     WITH i, p
-    MATCH (i)-[:HAS_ALERT]->(a:Alert)
+    MATCH (i)-[:HAS_ALERT]->(a:Alert)-[:AFFECTS]->(s:Service)
     MATCH (i)-[:HAS_HYPOTHESIS]->(h:Hypothesis)-[:TARGETS]->(culprit)
     WHERE h.status IN ['HYPOTHESIS_VERIFIED', 'REMEDIATING', 'RESOLVED']
 
@@ -590,6 +601,16 @@ async def graphsre_commit_postmortem(
                    r.last_seen = timestamp(),
                    r.last_decayed = timestamp(),
                    r.stale = false
+
+    MERGE (s)-[sr:SHORTCUT_TO_ROOT_CAUSE]->(culprit)
+      ON CREATE SET sr.weight = 0.95,
+                    sr.occurrences = 1,
+                    sr.last_seen = timestamp(),
+                    sr.stale = false
+      ON MATCH SET sr.weight = sr.weight + (0.50 * (1.0 - sr.weight)),
+                   sr.occurrences = sr.occurrences + 1,
+                   sr.last_seen = timestamp(),
+                   sr.stale = false
 
     RETURN p.id AS postmortem_id, i.state AS final_lifecycle_state, r.weight AS shortcut_edge_weight;
     """

@@ -3,6 +3,7 @@ FalkorDB Client Connection Pool & Query Interface
 File: server/falkordb_client.py
 """
 import os
+import json
 import logging
 from typing import Any, Dict, List, Optional
 
@@ -76,6 +77,23 @@ class FalkorDBClient:
             logger.error(f"Failed to ping FalkorDB: {e}")
             return False
 
+    @staticmethod
+    def _format_param_value(val: Any) -> str:
+        """Format Python values into FalkorDB CYPHER parameter literals."""
+        if isinstance(val, bool):
+            return "true" if val else "false"
+        elif isinstance(val, (int, float)):
+            return str(val)
+        elif isinstance(val, str):
+            escaped = val.replace("\\", "\\\\").replace("'", "\\'")
+            return f"'{escaped}'"
+        elif isinstance(val, (list, dict)):
+            return json.dumps(val)
+        elif val is None:
+            return "null"
+        else:
+            return json.dumps(val)
+
     async def execute_query(
         self,
         query: str,
@@ -84,14 +102,18 @@ class FalkorDBClient:
     ) -> List[Any]:
         """
         Execute an OpenCypher query against FalkorDB.
-        Uses GRAPH.QUERY command with optional parameters.
+        Uses GRAPH.QUERY command with native OpenCypher parameter prefix.
         """
         target_graph = graph or self.default_graph
         client = await self.get_client()
         try:
             if params:
+                param_parts = [
+                    f"{k}={self._format_param_value(v)}" for k, v in params.items()
+                ]
+                formatted_query = f"CYPHER {' '.join(param_parts)} {query}"
                 result = await client.execute_command(
-                    "GRAPH.QUERY", target_graph, query, "--params", str(params)
+                    "GRAPH.QUERY", target_graph, formatted_query
                 )
             else:
                 result = await client.execute_command(

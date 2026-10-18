@@ -119,10 +119,32 @@ async def test_execute_query_with_params():
     query = "MATCH (s:Service {name: $svc}) RETURN s.name"
     params = {"svc": "PaymentService"}
     result = await client.execute_query(query, params=params)
-    assert result == [["Header"], [["PaymentService"]]]
+    expected_query = "CYPHER svc='PaymentService' MATCH (s:Service {name: $svc}) RETURN s.name"
     mock_redis.execute_command.assert_called_once_with(
-        "GRAPH.QUERY", "graphsre_prod", query, "--params", str(params)
+        "GRAPH.QUERY", "graphsre_prod", expected_query
     )
+
+    # Test types formatting: string with quote, int, float, bool, list, dict
+    mock_redis.reset_mock()
+    mock_redis.execute_command.return_value = [["Header"], [[1]]]
+    complex_params = {
+        "text": "O'Reilly",
+        "num": 42,
+        "ratio": 3.14,
+        "is_active": True,
+        "tags": ["prod", "critical"],
+        "metadata": {"source": "alert_mgr"}
+    }
+    await client.execute_query("RETURN 1", params=complex_params)
+    called_query = mock_redis.execute_command.call_args[0][2]
+    assert "text='O\\'Reilly'" in called_query
+    assert "num=42" in called_query
+    assert "ratio=3.14" in called_query
+    assert "is_active=true" in called_query
+    assert 'tags=["prod", "critical"]' in called_query
+    assert 'metadata={"source": "alert_mgr"}' in called_query
+    assert called_query.startswith("CYPHER ")
+    assert called_query.endswith("RETURN 1")
 
 
 @pytest.mark.asyncio
