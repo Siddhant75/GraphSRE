@@ -207,15 +207,15 @@ GraphSRE bridges the gap between runtime telemetry and code-level version contro
 ```
 
 ### 1. Benchmark Open-Source Reference Topology
-The default seeded dataset in [`scripts/seed_mock_topology.py`](file:///d:/GraphHacks-hackathon/scripts/seed_mock_topology.py) is directly modeled on the industry-standard **Google Cloud Microservices Demo (Online Boutique)** and **Weaveworks Sock Shop**:
+The default seeded dataset in [`scripts/seed_mock_topology.py`](scripts/seed_mock_topology.py) is directly modeled on the industry-standard **Google Cloud Microservices Demo (Online Boutique)** and **Weaveworks Sock Shop**:
 - **Services:** `FrontendAPI`, `CheckoutService`, `PaymentService`, `InventoryService`, `NotificationService`, `AuthService`.
 - **Telemetry:** Ingests Prometheus/OpenTelemetry alert streams (`P99 Latency > 2000ms`, `HTTP 504 Gateway Timeout`, `DB Connection Pool Starvation`).
 - **Failure Scenario:** A real-world distributed outage pattern — an unhandled third-party gateway read timeout (`timeout=None`) inducing thread pool exhaustion and cascading ingress 504s.
 
 ### 2. Generic Open-Source Codebase Ingestion
 The underlying engines are **completely open and generic**:
-- **AST Code Ingestion Engine ([`backend/ast_parser.py`](file:///d:/GraphHacks-hackathon/backend/ast_parser.py)):** Can parse **any** open-source Python repository. It automatically walks the AST, extracts function call hierarchies (`[:CALLS]`), generates structural SHA256 hashes, and emits OpenCypher statements to populate FalkorDB.
-- **Shift-Left CI/CD Blast Gate ([`backend/api/cicd.py`](file:///d:/GraphHacks-hackathon/backend/api/cicd.py)):** Ingests arbitrary GitHub Pull Request diff patches, sanitizes unified diffs, extracts modified symbols, and calculates a 4-hop Structural Risk Index (SRI) before code is merged into production.
+- **AST Code Ingestion Engine ([`backend/ast_parser.py`](backend/ast_parser.py)):** Can parse **any** open-source Python repository. It automatically walks the AST, extracts function call hierarchies (`[:CALLS]`), generates structural SHA256 hashes, and emits OpenCypher statements to populate FalkorDB.
+- **Shift-Left CI/CD Blast Gate ([`backend/api/cicd.py`](backend/api/cicd.py)):** Ingests arbitrary GitHub Pull Request diff patches, sanitizes unified diffs, extracts modified symbols, and calculates a 4-hop Structural Risk Index (SRI) before code is merged into production.
 - **HNSW Vector Memory:** Ingests 384-dimensional sentence-transformer embeddings of historical SRE postmortems into native FalkorDB vector indices (`vecf32`) for sub-millisecond episodic recall.
 
 ---
@@ -268,30 +268,30 @@ GraphSRE represents the entire engineering ecosystem as a unified, queryable con
 
 ```mermaid
 graph TD
-    subgraph L1 [Layer 1: Telemetry and Incidents]
+    subgraph L1 ["Layer 1: Telemetry and Incidents"]
         Inc["Incident (id, state, sev)"]
         Alt["Alert (id, metric, threshold)"]
     end
 
-    subgraph L2 [Layer 2: Architecture and Topology]
+    subgraph L2 ["Layer 2: Architecture and Topology"]
         SvcUp["FrontendAPI (Tier 1)"]
         SvcPay["PaymentService (Tier 1)"]
     end
 
-    subgraph L3 [Layer 3: API Surface and Code AST]
+    subgraph L3 ["Layer 3: API Surface and Code AST"]
         Ep["Endpoint (/api/v1/charge)"]
         FnRoot["process_charge()"]
         FnCulprit["call_stripe_webhook()"]
     end
 
-    subgraph L4 [Layer 4: Git Versioning and Ownership]
+    subgraph L4 ["Layer 4: Git Versioning and Ownership"]
         Cmt["Commit c3d9a107 (Alice Chen)"]
         Eng["Alice Chen (Payment Squad)"]
         Tm["Payment Platform Team"]
         Sched["OnCall Schedule (Primary)"]
     end
 
-    subgraph L5 [Layer 5: Multi-Agent Blackboard and Quorum]
+    subgraph L5 ["Layer 5: Multi-Agent Blackboard and Quorum"]
         Hyp["Hypothesis (WCS: 0.88)"]
         Evi["Evidence (Metric Spike)"]
         AgTriage["Triage Agent"]
@@ -300,7 +300,7 @@ graph TD
         Plan["Remediation Plan (Canary Rollback)"]
     end
 
-    subgraph L6 [Layer 6: Episodic Memory and Runbooks]
+    subgraph L6 ["Layer 6: Episodic Memory and Runbooks"]
         Past["PastIncident (384-d HNSW Vector)"]
         Rb["Runbook (rb_net_042)"]
     end
@@ -337,7 +337,7 @@ graph TD
 
 ---
 
-### 2. Node Schema Catalog
+### 3. Node Schema Catalog
 
 | Node Label | Core Properties | Semantic Role & Purpose |
 | :--- | :--- | :--- |
@@ -359,7 +359,7 @@ graph TD
 
 ---
 
-### 3. Relationship Schema Catalog
+### 4. Relationship Schema Catalog
 
 | Relationship | Source $\to$ Target | Properties | Semantics & Graph Function |
 | :--- | :--- | :--- | :--- |
@@ -621,7 +621,7 @@ If the calculated **Structural Risk Index ($SRI$)** exceeds $0.60$, the gate rej
 | **Track 1: Connected Data** | Multi-hop cross-layer traversal from HTTP alerts to AST functions & Git commits via 7 FastMCP tools. | GraphBLAS Sparse Matrix Engine |
 | **Track 2: Memory & Coordination** | Central ACID blackboard replacing conversational token storms, 384-dim HNSW vector memory & quorum consensus. | Sub-millisecond Cypher Transactions & `GRAPH.COPY` |
 | **Track 3: Company Brain** | Socio-technical ownership linking AST functions to git authors; Shift-Left CI/CD blast gate; $O(1)$ shortcut nets. | Dynamic Edge Synthesis with Bayesian Decay |
-| **Side Prize: Technical Blog** | Publication-grade analysis of Vector RAG failure modes in SRE in [`blog.md`](file:///d:/GraphHacks-hackathon/blog.md) and [`docs/BLOG_POST.md`](file:///d:/GraphHacks-hackathon/docs/BLOG_POST.md). | Complete Platform Architecture |
+| **Side Prize: Technical Blog** | Publication-grade analysis of Vector RAG failure modes in SRE in [`blog.md`](blog.md) and [`docs/BLOG_POST.md`](docs/BLOG_POST.md). | Complete Platform Architecture |
 
 ---
 
