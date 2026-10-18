@@ -5,15 +5,6 @@
 
 ---
 
-## 🎬 Official 3-Minute Hackathon Demo Video
-🎥 **Watch the Full Submission Video on YouTube**: [https://youtu.be/4hPKV3G3fvE](https://youtu.be/4hPKV3G3fvE?si=BCL-C_wkvVIQpgKZ)
-- **Act 1: Clean Baseline Monitoring** — FalkorDB Central Blackboard monitoring 5 microservices across 3 tiers with GraphBLAS sparse reachability engine.
-- **Act 2: Chaos Injection & Autonomous Cross-Layer RCA** — HTTP 504 storm clustered via CDLP, golden causal path traversed across 5 layers down to commit `c3d9a107` (Alice Chen).
-- **Act 3: Multi-Agent Quorum & Sub-15ms `GRAPH.COPY` Sandboxing** — Agents persist votes directly to FalkorDB (`WCS = 0.88 >= 0.75`), ephemeral sandbox cloned and verified, 1-click canary rollback executed.
-- **Act 4: Closed-Loop O(1) Shortcut Net & Shift-Left CI/CD Blast Gate** — Persistent emerald shortcut edge compiled (`mttr: 78s -> 0.18s`), and PR #412 blocked via AST diff call-graph reachability!
-
----
-
 ## 📌 About GraphSRE
 **GraphSRE** is an Autonomous Site Reliability Engineering & Code Intelligence platform powered by **FalkorDB**. 
 
@@ -26,6 +17,17 @@ GraphSRE eliminates conversational message passing by using **FalkorDB as an ACI
 - **Zero-Risk Ephemeral Sandboxing:** Clones production state in $< 10\text{ ms}$ via `GRAPH.COPY` to test canary rollbacks safely before live execution.
 - **Closed-Loop $O(1)$ Shortcut Net:** Compiles learned shortcut edges with Bayesian temporal decay, dropping repeat incident MTTR from 78s to 0.18s ($433\times$ speedup).
 - **Shift-Left CI/CD Blast Gate:** Analyzes pull request code diffs against the production call graph to block outages before deployment.
+
+---
+
+## 🎬 Official 3-Minute Hackathon Demo Video
+[![Watch Demo on YouTube](https://img.shields.io/badge/YouTube-Watch%20Demo%20Video-red?style=for-the-badge&logo=youtube)](https://youtu.be/4hPKV3G3fvE?si=BCL-C_wkvVIQpgKZ)
+
+🎥 **Watch on YouTube**: [https://youtu.be/4hPKV3G3fvE](https://youtu.be/4hPKV3G3fvE?si=BCL-C_wkvVIQpgKZ)
+- **Act 1: Clean Baseline Monitoring** — FalkorDB Central Blackboard monitoring 5 microservices across 3 tiers with GraphBLAS sparse reachability engine.
+- **Act 2: Chaos Injection & Autonomous Cross-Layer RCA** — HTTP 504 storm clustered via CDLP, golden causal path traversed across 5 layers down to commit `c3d9a107` (Alice Chen).
+- **Act 3: Multi-Agent Quorum & Sub-15ms `GRAPH.COPY` Sandboxing** — Agents persist votes directly to FalkorDB (`WCS = 0.88 >= 0.75`), ephemeral sandbox cloned and verified, 1-click canary rollback executed.
+- **Act 4: Closed-Loop O(1) Shortcut Net & Shift-Left CI/CD Blast Gate** — Persistent emerald shortcut edge compiled (`mttr: 78s -> 0.18s`), and PR #412 blocked via AST diff call-graph reachability!
 
 ---
 
@@ -262,7 +264,7 @@ GraphSRE represents the entire engineering ecosystem as a unified, queryable con
                                           └─────────────────┘
 ```
 
-### 2. GitHub-Compliant Graph Schema Diagram
+### 2. Multi-Layer Knowledge Graph Schema
 
 ```mermaid
 graph TD
