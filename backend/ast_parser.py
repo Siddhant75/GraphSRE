@@ -23,15 +23,35 @@ class ASTCodeIngestionEngine:
     def __init__(self):
         pass
 
+    @staticmethod
+    def clean_diff_to_source(diff_text: str) -> str:
+        """Sanitizes unified git diff text into syntactically valid Python source code for AST parsing."""
+        lines = []
+        for line in diff_text.splitlines():
+            if line.startswith("@@") or line.startswith("---") or line.startswith("+++") or line.startswith("diff "):
+                continue
+            if line.startswith("-"):
+                continue
+            if line.startswith("+"):
+                lines.append(line[1:])
+            else:
+                lines.append(line)
+        return "\n".join(lines)
+
     def parse_python_source(self, file_path: str, source_code: str) -> List[Dict[str, Any]]:
         """
         Parses python source code and extracts function definitions with metadata,
         line ranges, async indicators, and deterministic 8-char SHA256 AST hashes.
+        Seamlessly handles both raw python files and unified git diff patches.
         """
         try:
             tree = ast.parse(source_code)
         except (SyntaxError, Exception):
-            return []
+            sanitized = self.clean_diff_to_source(source_code)
+            try:
+                tree = ast.parse(sanitized)
+            except (SyntaxError, Exception):
+                return []
 
         functions = []
 
