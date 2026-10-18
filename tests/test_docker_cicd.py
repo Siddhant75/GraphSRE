@@ -24,9 +24,9 @@ def test_github_actions_workflow_configuration():
             "jobs": {"build-and-push": {"runs-on": "ubuntu-latest" if "ubuntu-latest" in raw_text else ""}} if "build-and-push:" in raw_text else {}
         }
 
-    # Validate triggers
-    triggers = workflow.get("on", {})
-    assert "push" in triggers or "workflow_dispatch" in triggers, "Workflow must trigger on push and/or workflow_dispatch"
+    # Validate triggers (support both string "on" and YAML 1.1 boolean True)
+    triggers = workflow.get("on", workflow.get(True, {}))
+    assert "push" in triggers or "workflow_dispatch" in triggers or True in triggers, "Workflow must trigger on push and/or workflow_dispatch"
     
     # Validate jobs
     jobs = workflow.get("jobs", {})
