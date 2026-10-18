@@ -207,81 +207,115 @@ The underlying engines are **completely open and generic**:
 
 GraphSRE represents the entire engineering ecosystem as a unified, queryable connected knowledge graph in **FalkorDB**, bridging runtime telemetry, service architectures, polyglot code Abstract Syntax Trees (AST), git versioning, and multi-agent coordination state.
 
-### 1. Unified Graph Architecture Diagram
+> 📖 **Exhaustive Schema Catalog:** For detailed property specifications, data types, and index DDL, see [`docs/GRAPH_SCHEMA.md`](docs/GRAPH_SCHEMA.md).
+
+### 1. Cross-Layer Architecture
+
+```
+                                ┌───────────────────────────────────────┐
+                                │          (:Incident {id, sev})        │
+                                └──────────────────┬────────────────────┘
+                                                   │ [:HAS_ALERT]
+                                                   ▼
+┌───────────────────────┐  [:DEPENDS_ON]  ┌─────────────────┐
+│ (:Service {Frontend}) ├────────────────►│ (:Service {Pay})│
+└───────────────────────┘                 └────────┬────────┘
+                                                   │ [:EXPOSES]
+                                                   ▼
+                                          ┌─────────────────┐
+                                          │  (:Endpoint)    │
+                                          └────────┬────────┘
+                                                   │ [:IMPLEMENTED_BY]
+                                                   ▼
+                                          ┌─────────────────┐
+                                          │ (:Function)     │
+                                          └────────┬────────┘
+                                                   │ [:CALLS*]
+                                                   ▼
+                                          ┌─────────────────┐
+                                          │ (:Function)     │◄─ ─ ─ ─ ─ ─ ─ ─[:SHORTCUT_TO_ROOT_CAUSE]─ ─ ─(:Service {Pay})
+                                          └────────┬────────┘
+                                                   │ [:MODIFIED_BY]
+                                                   ▼
+                                          ┌─────────────────┐
+                                          │   (:Commit)     │
+                                          └────────┬────────┘
+                                                   │ [:AUTHORED_BY]
+                                                   ▼
+                                          ┌─────────────────┐
+                                          │  (:Engineer)    │
+                                          └─────────────────┘
+```
+
+### 2. GitHub-Compliant Graph Schema Diagram
 
 ```mermaid
-flowchart TD
-    subgraph L1 ["Layer 1: Telemetry & Incidents"]
-        Inc["(:Incident)<br/><code>id, state, severity, blast_radius</code>"]
-        Alt["(:Alert)<br/><code>id, name, metric_value, threshold</code>"]
+graph TD
+    subgraph L1 [Layer 1: Telemetry and Incidents]
+        Inc["Incident (id, state, sev)"]
+        Alt["Alert (id, metric, threshold)"]
     end
 
-    subgraph L2 ["Layer 2: Architecture & Topology"]
-        SvcUp["(:Service {name: 'FrontendAPI'})<br/><code>tier: 'TIER_1', pagerank: 0.85</code>"]
-        SvcPay["(:Service {name: 'PaymentService'})<br/><code>tier: 'TIER_1', pagerank: 0.92</code>"]
+    subgraph L2 [Layer 2: Architecture and Topology]
+        SvcUp["FrontendAPI (Tier 1)"]
+        SvcPay["PaymentService (Tier 1)"]
     end
 
-    subgraph L3 ["Layer 3: API Surface & Code AST"]
-        Ep["(:Endpoint)<br/><code>path: '/api/v1/charge'</code>"]
-        FnRoot["(:Function)<br/><code>process_charge</code>"]
-        FnCulprit["(:Function)<br/><code>call_stripe_webhook</code>"]
+    subgraph L3 [Layer 3: API Surface and Code AST]
+        Ep["Endpoint (/api/v1/charge)"]
+        FnRoot["process_charge()"]
+        FnCulprit["call_stripe_webhook()"]
     end
 
-    subgraph L4 ["Layer 4: Git Versioning & Ownership"]
-        Cmt["(:Commit)<br/><code>sha: 'c3d9a107', diff: '- timeout=3.0'</code>"]
-        Eng["(:Engineer)<br/><code>Alice Chen (alice@company.io)</code>"]
-        Tm["(:Team)<br/><code>Payment Platform Team</code>"]
-        Sched["(:OnCallSchedule)<br/><code>Primary 24/7 Escalation</code>"]
+    subgraph L4 [Layer 4: Git Versioning and Ownership]
+        Cmt["Commit c3d9a107 (Alice Chen)"]
+        Eng["Alice Chen (Payment Squad)"]
+        Tm["Payment Platform Team"]
+        Sched["OnCall Schedule (Primary)"]
     end
 
-    subgraph L5 ["Layer 5: Multi-Agent Blackboard & Quorum"]
-        Hyp["(:Hypothesis)<br/><code>status: 'VERIFIED', wcs: 0.88</code>"]
-        Evi["(:Evidence)<br/><code>type: 'METRIC_SPIKE', confidence: 0.95</code>"]
-        AgTriage["(:Agent {name: 'Triage_Agent'})"]
-        AgRCA["(:Agent {name: 'RCA_Agent'})"]
-        AgMem["(:Agent {name: 'Memory_Agent'})"]
-        Plan["(:RemediationPlan)<br/><code>canary rollback, state: 'ACTIVE'</code>"]
+    subgraph L5 [Layer 5: Multi-Agent Blackboard and Quorum]
+        Hyp["Hypothesis (WCS: 0.88)"]
+        Evi["Evidence (Metric Spike)"]
+        AgTriage["Triage Agent"]
+        AgRCA["RCA Agent"]
+        AgMem["Memory Agent"]
+        Plan["Remediation Plan (Canary Rollback)"]
     end
 
-    subgraph L6 ["Layer 6: Episodic Memory & Runbooks"]
-        Past["(:PastIncident)<br/><code>vecf32 embedding (384-d HNSW)</code>"]
-        Rb["(:Runbook)<br/><code>id: 'rb_net_042', success_rate: 0.98</code>"]
+    subgraph L6 [Layer 6: Episodic Memory and Runbooks]
+        Past["PastIncident (384-d HNSW Vector)"]
+        Rb["Runbook (rb_net_042)"]
     end
 
-    %% Telemetry to Service
     Inc -->|HAS_ALERT| Alt
     Alt -->|AFFECTS| SvcPay
     SvcUp -->|DEPENDS_ON| SvcPay
 
-    %% Service to Code AST
     SvcPay -->|EXPOSES| Ep
     Ep -->|IMPLEMENTED_BY| FnRoot
     FnRoot -->|CALLS| FnCulprit
     FnCulprit -->|MODIFIED_BY| Cmt
 
-    %% Git to People
     Cmt -->|AUTHORED_BY| Eng
     Eng -->|MEMBER_OF| Tm
     SvcPay -->|OWNED_BY| Tm
     Eng -->|ON_CALL| Sched
     Tm -->|HAS_SCHEDULE| Sched
 
-    %% Blackboard & Quorum
     Inc -->|HAS_HYPOTHESIS| Hyp
     Hyp -->|TARGETS| Cmt
     Hyp -->|SUPPORTED_BY| Evi
-    AgTriage -->|VOTED_ON {decision: 'APPROVE'}| Hyp
-    AgRCA -->|VOTED_ON {decision: 'APPROVE'}| Hyp
-    AgMem -->|VOTED_ON {decision: 'APPROVE'}| Hyp
+    AgTriage -->|VOTED_APPROVE| Hyp
+    AgRCA -->|VOTED_APPROVE| Hyp
+    AgMem -->|VOTED_APPROVE| Hyp
     Hyp -->|GENERATES_PLAN| Plan
 
-    %% Episodic Memory
     Inc -->|ARCHIVED_AS| Past
     Past -->|AFFECTED_SERVICE| SvcPay
-    Past -->|RESOLVED_BY_PLAYBOOK| Rb
+    Past -->|RESOLVED_BY| Rb
 
-    %% O(1) Shortcut Net
-    SvcPay -.->|SHORTCUT_TO_ROOT_CAUSE {weight: 0.95}| FnCulprit
+    SvcPay -.->|SHORTCUT_TO_ROOT_CAUSE| FnCulprit
 ```
 
 ---
