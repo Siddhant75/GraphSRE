@@ -69,12 +69,13 @@ pnpm-debug.log*
 # Internal Planning & Scratch Files
 docs/plans/
 
-# Demo Video Recordings & Media
+# Demo Video Recordings, Voiceovers & Media
 demo_video/*.webm
 demo_video/*.mp4
 demo_video/node_modules/
 demo_video/output/
-demo_video/audio/*.wav
+demo_video/audio/
+scripts/generate_voiceover.py
 *.webm
 *.mp4
 *.wav
