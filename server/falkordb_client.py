@@ -58,7 +58,9 @@ class FalkorDBClient:
             host=self.host,
             port=self.port,
             decode_responses=True,
-            max_connections=max_connections
+            max_connections=max_connections,
+            socket_connect_timeout=0.2,
+            socket_timeout=1.0
         )
         self.client: Optional[redis.Redis] = None
 

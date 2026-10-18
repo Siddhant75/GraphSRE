@@ -74,8 +74,10 @@ demo_video/*.webm
 demo_video/*.mp4
 demo_video/node_modules/
 demo_video/output/
+demo_video/audio/*.wav
 *.webm
 *.mp4
+*.wav
 
 # IDE & OS
 .vscode/
