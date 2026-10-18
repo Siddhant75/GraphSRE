@@ -111,6 +111,14 @@ def get_seed_cypher() -> str:
     CREATE (eng_alice)-[:MEMBER_OF]->(team_pay)
     CREATE (eng_bob)-[:MEMBER_OF]->(team_core)
 
+    // On-Call Schedules & Escalation Rotations
+    CREATE (sched_pay:OnCallSchedule {id: 'sched_payments_primary', layer: 'primary', shift: '2026-W42', escalation_policy: 'PAGERDUTY_SEV1'})
+    CREATE (sched_sre:OnCallSchedule {id: 'sched_sre_primary', layer: 'primary', shift: '2026-W42', escalation_policy: 'PAGERDUTY_SEV1'})
+    CREATE (eng_alice)-[:ON_CALL {status: 'ACTIVE', tier: 1}]->(sched_pay)
+    CREATE (eng_bob)-[:ON_CALL {status: 'ACTIVE', tier: 1}]->(sched_sre)
+    CREATE (team_pay)-[:HAS_SCHEDULE]->(sched_pay)
+    CREATE (team_core)-[:HAS_SCHEDULE]->(sched_sre)
+
     // 7. Create Validated Procedural Runbook
     CREATE (rb:Runbook {id: 'rb_net_042', title: 'Remediate Socket Read Timeout & Thread Pool Exhaustion', success_rate: 0.98})
     """
@@ -206,12 +214,11 @@ def seed_database(
         print("Seeding Episodic Memory Historical Postmortems with vecf32 embeddings...")
         embedding = generate_normalized_embedding(384)
         try:
+            formatted_query = f"CYPHER vec={json.dumps(embedding)} {get_past_incident_cypher()}"
             r.execute_command(
                 "GRAPH.QUERY",
                 falkor_graph,
-                get_past_incident_cypher(),
-                "--params",
-                json.dumps({"vec": embedding}),
+                formatted_query,
             )
             logger.info("Graph topology and vector-indexed postmortems seeded successfully.")
             print("Graph topology and vector-indexed postmortems seeded successfully.")

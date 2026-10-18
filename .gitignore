@@ -36,6 +36,7 @@ node_modules/
 .next/
 out/
 .nuxt/
+*.tsbuildinfo
 
 # Testing & Coverage
 .pytest_cache/
@@ -69,7 +70,10 @@ pnpm-debug.log*
 docs/plans/
 
 # Demo Video Recordings & Media
-demo_video/
+demo_video/*.webm
+demo_video/*.mp4
+demo_video/node_modules/
+demo_video/output/
 *.webm
 *.mp4
 
