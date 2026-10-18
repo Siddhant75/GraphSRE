@@ -1,7 +1,8 @@
 # Why Vector RAG Fails in SRE and How We Built an Autonomous Code Brain with FalkorDB
 
 *Authored by the GraphSRE Team for the FalkorDB + WeMakeDevs GraphHacks Hackathon (2026)*  
-*Targeting the Hackathon Side Prize ($20k Prize Pool / AirPods 5)*
+*Targeting the Hackathon Side Prize ($20k Prize Pool / AirPods 5)*  
+*Demo Video:* [`demo_video/graphsre_demo_submission.webm`](file:///d:/GraphHacks-hackathon/demo_video/graphsre_demo_submission.webm)
 
 ---
 
@@ -286,6 +287,10 @@ Under the hood, FalkorDB leverages **GraphBLAS**, an open API standard that expr
 Traversing a multi-hop path—such as tracing an alert through 5 microservice dependencies and 4 AST function call depths—is computed as a sparse matrix-matrix multiplication:
 
 $$C = A \cdot B \quad \text{over the }(\min, +)\text{ or Boolean semiring}$$
+
+Furthermore, $K$-hop bounded reachability across heterogeneous entity layers is computed as the matrix power series:
+
+$$\mathbf{R}^{(K)} = \bigvee_{k=1}^K \mathbf{A}^k \quad \text{over the Boolean semiring } (\lor, \land)$$
 
 Because GraphBLAS executes highly optimized SIMD parallel sparse matrix kernels, multi-hop reachability queries across 500,000 nodes execute in **less than 1 millisecond** (typically 0.40–0.85 ms). Traditional graph databases relying on pointer-chasing linked lists suffer from cache misses and take 50 to 500 milliseconds for identical traversals.
 

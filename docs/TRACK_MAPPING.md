@@ -63,6 +63,7 @@ GraphSRE builds a permanent, living socio-technical model of the organization, l
 ---
 
 ## 🎁 Hackathon Side Prize: Technical Blog Post
-Published in `blog.md`:
-*"Why Vector RAG Fails in SRE and How We Built an Autonomous Code Brain with FalkorDB"*
+Published in [`blog.md`](file:///d:/GraphHacks-hackathon/blog.md) and [`docs/BLOG_POST.md`](file:///d:/GraphHacks-hackathon/docs/BLOG_POST.md):
+*"Why Vector RAG Fails in SRE and How We Built an Autonomous Code Brain with FalkorDB"*  
+Demo Video: [`demo_video/graphsre_demo_submission.webm`](file:///d:/GraphHacks-hackathon/demo_video/graphsre_demo_submission.webm)  
 Targeting the $20,000 prize pool and AirPods 5.
