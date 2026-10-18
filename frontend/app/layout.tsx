@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import Link from 'next/link';
 import React from 'react';
+import NavbarStatus from '@/components/NavbarStatus';
 
 export const metadata: Metadata = {
   title: 'GraphSRE: Autonomous SRE & Code Brain',
@@ -39,10 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </nav>
 
           <div className="flex items-center space-x-3 text-xs">
-            <span className="px-2.5 py-1 bg-red-950/80 border border-red-500/40 text-red-300 rounded font-semibold flex items-center space-x-1.5">
-              <span className="w-2 h-2 rounded-full bg-red-500 animate-ping inline-block" />
-              <span>Active Sev: 1 (Outage)</span>
-            </span>
+            <NavbarStatus />
             <span className="px-2.5 py-1 bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 rounded font-mono">
               FalkorDB: Connected (GraphBLAS)
             </span>

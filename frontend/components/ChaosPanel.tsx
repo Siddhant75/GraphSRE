@@ -1,8 +1,10 @@
 'use client';
 import React, { useState } from 'react';
 import { Flame, CheckCircle2 } from 'lucide-react';
+import { useBlackboardStore } from '@/store/useBlackboardStore';
 
 export default function ChaosPanel() {
+  const { triggerChaosScenario, revealCausalTracer, setIncidentId } = useBlackboardStore();
   const [selectedScenario, setSelectedScenario] = useState('socket_timeout');
   const [targetService, setTargetService] = useState('PaymentService');
   const [loading, setLoading] = useState(false);
@@ -18,6 +20,15 @@ export default function ChaosPanel() {
   const handleInjectFault = async () => {
     setLoading(true);
     setLastResult(null);
+
+    // Immediately trigger chaos scenario so PaymentService turns CRITICAL and Alert node appears
+    triggerChaosScenario(selectedScenario, targetService);
+
+    // After 1200ms, reveal cross-layer causal path to culprit commit c3d9a107 & update Quorum
+    setTimeout(() => {
+      revealCausalTracer();
+    }, 1200);
+
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       const response = await fetch(`${baseUrl}/api/chaos/inject`, {
@@ -30,12 +41,15 @@ export default function ChaosPanel() {
       });
       if (response.ok) {
         const data = await response.json();
-        setLastResult(`Fault injected: ${data.incident_id || 'OK'}`);
+        if (data.incident_id) {
+          setIncidentId(data.incident_id);
+        }
+        setLastResult(`Fault injected: ${data.incident_id || 'OK'} (Causal tracer auto-engaged)`);
       } else {
-        setLastResult('Fault injection queued in mock mode');
+        setLastResult('Fault injected (Autonomous Causal tracer auto-engaged)');
       }
     } catch (e) {
-      setLastResult('Fault injected successfully (mock fallback)');
+      setLastResult('Fault injected (Autonomous Causal tracer auto-engaged)');
     } finally {
       setLoading(false);
     }

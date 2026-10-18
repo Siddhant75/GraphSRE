@@ -116,6 +116,54 @@ async def test_websocket_room_isolation():
         assert msg_a["agent"] == "Triage_Agent"
 
 
+@pytest.mark.asyncio
+async def test_websocket_broadcasts_on_api_mutations():
+    """Verify state mutating REST endpoints broadcast frames over WebSockets to subscribed incident rooms."""
+    incident_id = "inc_broadcast_test"
+    with client.websocket_connect(f"/ws/blackboard/{incident_id}") as ws:
+        ws.send_json({"type": "SUBSCRIBE", "incident_id": incident_id})
+        sub_ack = ws.receive_json()
+        assert sub_ack["type"] == "SUBSCRIBED"
+
+        # 1. Consensus Vote endpoint
+        vote_payload = {
+            "agent_id": "Memory_Agent",
+            "hypothesis_id": "hyp_test_01",
+            "decision": "APPROVE",
+            "weight": 0.35,
+            "reasoning": "Vector match 0.94"
+        }
+        res = client.post(f"/api/incidents/{incident_id}/consensus", json=vote_payload)
+        assert res.status_code == 200
+
+        vote_frame = ws.receive_json()
+        assert vote_frame["type"] == "CONSENSUS_VOTE"
+        assert vote_frame["incident_id"] == incident_id
+        assert vote_frame["agent"] == "Memory_Agent"
+        assert vote_frame["decision"] == "APPROVE"
+
+        # 2. Remediate Incident endpoint
+        remed_payload = {
+            "action_type": "CANARY_REVERT",
+            "target_service": "PaymentService",
+            "simulate_sandbox": False
+        }
+        res = client.post(f"/api/incidents/{incident_id}/remediate", json=remed_payload)
+        assert res.status_code == 200
+
+        state_frame = ws.receive_json()
+        assert state_frame["type"] == "STATE_CHANGE"
+        assert state_frame["state"] == "RESOLVED"
+
+        mutation_frame = ws.receive_json()
+        assert mutation_frame["type"] == "GRAPH_MUTATION"
+        assert mutation_frame["delta"]["edges_added"][0]["label"] == "CAUSED_BY_SHORTCUT"
+
+        thought_frame = ws.receive_json()
+        assert thought_frame["type"] == "AGENT_THOUGHT"
+        assert thought_frame["agent"] == "Remediation_Agent"
+
+
 if __name__ == "__main__":
     from backend.compat import run_coroutine
 
@@ -124,6 +172,7 @@ if __name__ == "__main__":
         ("test_websocket_broadcast_frames", test_websocket_broadcast_frames),
         ("test_websocket_disconnect_cleanup", test_websocket_disconnect_cleanup),
         ("test_websocket_room_isolation", test_websocket_room_isolation),
+        ("test_websocket_broadcasts_on_api_mutations", test_websocket_broadcasts_on_api_mutations),
     ]
 
     passed = 0

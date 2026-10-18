@@ -6,6 +6,7 @@ import QuorumMeter from '@/components/QuorumMeter';
 import ActionCard from '@/components/ActionCard';
 import ChaosPanel from '@/components/ChaosPanel';
 import ShortcutVisualizer from '@/components/ShortcutVisualizer';
+import CypherConsole from '@/components/CypherConsole';
 import { useBlackboardStore } from '@/store/useBlackboardStore';
 
 export default function WarRoomPage() {
@@ -22,13 +23,17 @@ export default function WarRoomPage() {
         </div>
         <div className="bg-[#0F172A] border border-red-500/30 rounded-xl p-4">
           <span className="text-xs text-red-400 font-semibold font-mono">Dynamic Severity</span>
-          <h3 className="text-lg font-bold text-red-400 mt-1">{severity} (Critical Outage)</h3>
+          <h3 className="text-lg font-bold text-red-400 mt-1">
+            {severity} {severity === 'SEV_1' ? '(Critical Outage)' : '(Monitoring)'}
+          </h3>
           <span className="text-[11px] text-gray-400">PageRank: 0.884 | Tier: 1</span>
         </div>
         <div className="bg-[#0F172A] border border-[#1E293B] rounded-xl p-4">
           <span className="text-xs text-gray-400 font-mono">Blast Radius</span>
           <h3 className="text-lg font-bold text-white mt-1">{blastRadius} Microservices</h3>
-          <span className="text-[11px] text-gray-400">Cart, Checkout, FrontendAPI</span>
+          <span className="text-[11px] text-gray-400">
+            {blastRadius > 0 ? 'Cart, Checkout, FrontendAPI' : 'All systems operating within baseline'}
+          </span>
         </div>
         <QuorumMeter />
       </div>
@@ -55,6 +60,9 @@ export default function WarRoomPage() {
 
       {/* Chaos Injection Controller */}
       <ChaosPanel />
+
+      {/* Live OpenCypher & GraphBLAS Execution Stream Terminal */}
+      <CypherConsole />
     </div>
   );
 }

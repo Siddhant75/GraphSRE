@@ -10,6 +10,7 @@ except ImportError:
     from backend.compat import APIRouter
 
 from backend.models import ChaosInjectRequest
+from backend.websocket.hub import ws_hub
 
 router = APIRouter(prefix="/api/chaos", tags=["chaos"])
 
@@ -18,6 +19,24 @@ router = APIRouter(prefix="/api/chaos", tags=["chaos"])
 async def inject_chaos(req: ChaosInjectRequest):
     """Triggers synthetic fault injection across microservices."""
     incident_id = f"inc_chaos_{uuid.uuid4().hex[:6]}"
+
+    # Broadcast STATE_CHANGE and AGENT_THOUGHT to incident room
+    await ws_hub.broadcast_to_room(incident_id, {
+        "type": "STATE_CHANGE",
+        "state": "DETECTED",
+        "incident_id": incident_id,
+        "timestamp": int(time.time() * 1000)
+    })
+    await ws_hub.broadcast_to_room(incident_id, {
+        "type": "AGENT_THOUGHT",
+        "incident_id": incident_id,
+        "agent": "Triage",
+        "text": f"Chaos fault injected into {req.service}: {req.scenario}. Ingesting telemetry alert stream...",
+        "thought": f"Chaos fault injected into {req.service}: {req.scenario}. Ingesting telemetry alert stream...",
+        "confidence": 0.95,
+        "timestamp": int(time.time() * 1000)
+    })
+
     return {
         "status": "FAULT_INJECTED",
         "incident_id": incident_id,
