@@ -694,10 +694,10 @@ async def remediate_incident(incident_id: str, req: RemediateIncidentRequest):
             "nodes_added": [],
             "edges_added": [
                 {
-                    "source": incident_id,
-                    "target": req.target_service or "PaymentService",
-                    "label": "CAUSED_BY_SHORTCUT",
-                    "weight": 0.90
+                    "source": "svc_payment",
+                    "target": "fn_stripe",
+                    "label": "SHORTCUT_TO_ROOT_CAUSE",
+                    "weight": 0.95
                 }
             ]
         },

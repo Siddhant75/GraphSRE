@@ -28,33 +28,73 @@ export default function TopologyCanvas() {
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const cy = cytoscape({
-      container: containerRef.current,
-      elements: elements,
-      style: cytoscapeStylesheet,
-      layout: {
-        name: activeLayout,
-        animate: true,
-        animationDuration: 500,
-        padding: 50
-      } as any
-    });
-
-    cy.on('tap', 'node', (evt) => {
-      setSelectedNode(evt.target.data());
-    });
-
-    cy.on('tap', (evt) => {
-      if (evt.target === cy) {
-        setSelectedNode(null);
+    // Defensively sanitize elements:
+    // Only allow nodes, and edges whose source and target exist among the nodes.
+    const nodeIds = new Set<string>();
+    for (const el of elements) {
+      if (el?.data && !el.data.source && !el.data.target && el.data.id) {
+        nodeIds.add(String(el.data.id));
       }
+    }
+
+    const validElements = elements.filter((el) => {
+      if (!el?.data) return false;
+      if (el.data.source || el.data.target) {
+        const hasSource = nodeIds.has(String(el.data.source));
+        const hasTarget = nodeIds.has(String(el.data.target));
+        return hasSource && hasTarget;
+      }
+      return Boolean(el.data.id);
     });
 
-    cyRef.current = cy;
+    try {
+      if (cyRef.current) {
+        cyRef.current.destroy();
+        cyRef.current = null;
+      }
+
+      const cy = cytoscape({
+        container: containerRef.current,
+        elements: validElements,
+        style: cytoscapeStylesheet,
+        layout: {
+          name: activeLayout,
+          animate: true,
+          animationDuration: 500,
+          padding: 50
+        } as any
+      });
+
+      cy.on('tap', 'node', (evt) => {
+        try {
+          setSelectedNode(evt.target.data());
+        } catch (e) {
+          console.warn("Node tap handler:", e);
+        }
+      });
+
+      cy.on('tap', (evt) => {
+        try {
+          if (evt.target === cy) {
+            setSelectedNode(null);
+          }
+        } catch (e) {
+          console.warn("Canvas tap handler:", e);
+        }
+      });
+
+      cyRef.current = cy;
+    } catch (err) {
+      console.error("Cytoscape initialization caught error:", err);
+    }
 
     return () => {
-      cy.destroy();
-      cyRef.current = null;
+      if (cyRef.current) {
+        try {
+          cyRef.current.destroy();
+        } catch (e) {}
+        cyRef.current = null;
+      }
     };
   }, [elements, activeLayout, setSelectedNode]);
 

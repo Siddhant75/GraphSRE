@@ -248,6 +248,15 @@ async function runAutomation() {
 
   const page = await context.newPage();
 
+  page.on('pageerror', err => {
+    console.error('>> BROWSER PAGE ERROR:', err.message);
+  });
+  page.on('console', msg => {
+    if (msg.type() === 'error') {
+      console.error('>> BROWSER CONSOLE ERROR:', msg.text());
+    }
+  });
+
   try {
     // =========================================================================
     // ACT 0: The 3:00 AM Outage & Why Vector RAG Fails (Target: 38.95s)

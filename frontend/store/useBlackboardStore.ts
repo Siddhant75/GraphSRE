@@ -171,11 +171,24 @@ export const useBlackboardStore = create<BlackboardState>((set, get) => ({
         return el;
       });
 
+      // Ensure culprit function node exists before adding shortcut edge
+      if (!updatedElements.some((e) => e.data && e.data.id === "fn_stripe")) {
+        updatedElements.push({
+          data: {
+            id: "fn_stripe",
+            label: "call_stripe_webhook",
+            type: "Function",
+            file_path: "payment/gateway.py",
+            line_start: 42
+          }
+        });
+      }
+
       const shortcutEdge = {
-        id: "alt_p99_SHORTCUT_fn_stripe",
-        source: "alt_p99",
+        id: "svc_payment_SHORTCUT_fn_stripe",
+        source: "svc_payment",
         target: "fn_stripe",
-        label: "CAUSED_BY_SHORTCUT",
+        label: "SHORTCUT_TO_ROOT_CAUSE",
         type: "CAUSED_BY_SHORTCUT"
       };
 
@@ -225,18 +238,30 @@ export const useBlackboardStore = create<BlackboardState>((set, get) => ({
       }
     }
     if (delta.edges_added) {
+      const nodeIds = new Set(updatedElements.filter(e => e.data && !e.data.source && !e.data.target).map(e => e.data.id));
       for (const edge of delta.edges_added) {
-        const edgeId = edge.id || `${edge.source}_${edge.label}_${edge.target}`;
-        if (!updatedElements.some(e => e.data && (e.data.id === edgeId || (e.data.source === edge.source && e.data.target === edge.target && e.data.label === edge.label)))) {
-          updatedElements.push({
-            data: {
-              id: edgeId,
-              source: edge.source,
-              target: edge.target,
-              label: edge.label,
-              ...edge.properties
-            }
-          });
+        let src = edge.source;
+        let tgt = edge.target;
+        if (src === "PaymentService") src = "svc_payment";
+        if (tgt === "PaymentService") tgt = "svc_payment";
+        if (src === "c3d9a107") src = "commit_c3d9";
+        if (tgt === "c3d9a107") tgt = "commit_c3d9";
+
+        // Only add edge if both endpoints exist in the graph
+        if (nodeIds.has(src) && nodeIds.has(tgt)) {
+          const edgeId = edge.id || `${src}_${edge.label}_${tgt}`;
+          if (!updatedElements.some(e => e.data && e.data.id === edgeId)) {
+            updatedElements.push({
+              data: {
+                id: edgeId,
+                source: src,
+                target: tgt,
+                label: edge.label,
+                type: edge.label === "CAUSED_BY_SHORTCUT" || edge.label === "SHORTCUT_TO_ROOT_CAUSE" ? "CAUSED_BY_SHORTCUT" : undefined,
+                ...edge.properties
+              }
+            });
+          }
         }
       }
     }
