@@ -72,6 +72,7 @@ docs/plans/
 # Demo Video Recordings, Voiceovers & Media
 demo_video/*.webm
 demo_video/*.mp4
+demo_video/verification_frames/
 demo_video/node_modules/
 demo_video/output/
 demo_video/audio/
@@ -79,6 +80,9 @@ scripts/generate_voiceover.py
 *.webm
 *.mp4
 *.wav
+*.m4a
+*.aac
+*.mp3
 
 # IDE & OS
 .vscode/

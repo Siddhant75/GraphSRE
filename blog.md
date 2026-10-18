@@ -2,7 +2,7 @@
 
 *Authored by the GraphSRE Team for the FalkorDB + WeMakeDevs GraphHacks Hackathon (2026)*  
 *Targeting the Hackathon Side Prize ($20k Prize Pool / AirPods 5)*  
-*Demo Video:* [`demo_video/graphsre_demo_submission.webm`](file:///d:/GraphHacks-hackathon/demo_video/graphsre_demo_submission.webm)
+*Demo Video:* [Watch on YouTube](https://youtu.be/4hPKV3G3fvE?si=BCL-C_wkvVIQpgKZ)
 
 ---
 

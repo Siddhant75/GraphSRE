@@ -6,7 +6,7 @@
 ---
 
 ## 🎬 Official 3-Minute Hackathon Demo Video
-🎥 **Watch the Full Submission Video**: [`demo_video/graphsre_demo_submission.webm`](file:///d:/GraphHacks-hackathon/demo_video/graphsre_demo_submission.webm)
+🎥 **Watch the Full Submission Video on YouTube**: [https://youtu.be/4hPKV3G3fvE](https://youtu.be/4hPKV3G3fvE?si=BCL-C_wkvVIQpgKZ)
 - **Act 1: Clean Baseline Monitoring** — FalkorDB Central Blackboard monitoring 5 microservices across 3 tiers with GraphBLAS sparse reachability engine.
 - **Act 2: Chaos Injection & Autonomous Cross-Layer RCA** — HTTP 504 storm clustered via CDLP, golden causal path traversed across 5 layers down to commit `c3d9a107` (Alice Chen).
 - **Act 3: Multi-Agent Quorum & Sub-15ms `GRAPH.COPY` Sandboxing** — Agents persist votes directly to FalkorDB (`WCS = 0.88 >= 0.75`), ephemeral sandbox cloned and verified, 1-click canary rollback executed.
@@ -48,55 +48,119 @@
 
 ---
 
-## ⚡ Zero Local Build Quickstart for Hackathon Judges
+## 🚀 Project Setup & Quickstart Guide
 
-To ensure developers and judges with strictly limited disk space experience zero local compilation overhead, **all container images are pre-built via GitHub Actions cloud CI/CD and hosted on Docker Hub**:
+### 📋 Prerequisites
+Before running GraphSRE, ensure you have:
+- **Docker & Docker Compose** (v20.10+ / Compose v2.0+) — [Get Docker](https://docs.docker.com/get-docker/)
+- **Python 3.10+** (if running bare-metal backend or test suites)
+- **Node.js 18+** & **npm** / **pnpm** (if running bare-metal frontend)
+- **Git**
 
+---
+
+### Option A: 1-Click Launch via Docker Compose (Recommended)
+
+To ensure developers and hackathon judges experience zero local compilation overhead, **all container images are pre-built via GitHub Actions cloud CI/CD and hosted on Docker Hub**:
 - `sid7899999/graphsre-backend:latest`
 - `sid7899999/graphsre-frontend:latest`
 - `falkordb/falkordb:latest`
 
-### 1-Click Launch:
 ```bash
 # 1. Clone the repository
 git clone https://github.com/Siddhant75/GraphSRE.git
 cd GraphSRE
 
-# 2. Pull pre-built images from Docker Hub (0 local build disk space!)
+# 2. Configure environment (defaults work out-of-the-box)
+cp .env.example .env
+
+# 3. Pull pre-built images from Docker Hub (zero local compilation disk space!)
 docker compose pull
 
-# 3. Start the entire platform
+# 4. Start all services in the background
 docker compose up -d
 
-# 4. Seed FalkorDB with mock topology, AST call trees & vector memory
+# 5. Seed FalkorDB with the 5-layer socio-technical graph & HNSW vector memory
 docker compose exec backend python scripts/seed_mock_topology.py
-# (Or locally: python scripts/seed_mock_topology.py)
 ```
 
-### Access URLs:
-- **Next.js 14 War Room UI (Cytoscape.js Interactive Graph Canvas):** `http://localhost:3000`
-- **FastAPI OpenAPI Documentation:** `http://localhost:8000/docs`
-- **FastMCP Agent Tool Server:** `http://localhost:8001` or `python server/mcp_server.py`
+#### Access Points:
+- **Next.js 14 War Room UI (Cytoscape.js Interactive Graph Canvas):** [http://localhost:3000](http://localhost:3000)
+- **FastAPI OpenAPI Swagger Documentation:** [http://localhost:8000/docs](http://localhost:8000/docs)
+- **FastMCP Agent Tool Server:** [http://localhost:8001](http://localhost:8001)
 
 ---
 
-## 🛠️ Bare-Metal Local Development (Minimal Disk Footprint)
+### Option B: Bare-Metal Local Development
 
+For developers wishing to run backend services and frontend interfaces directly on their host machine:
+
+#### 1. Start FalkorDB
 ```bash
-# 1. Launch lightweight FalkorDB container
 docker run -d -p 6379:6379 --name falkordb falkordb/falkordb:latest
+```
 
-# 2. Setup Python environment
+#### 2. Configure Environment Variables
+```bash
+cp .env.example .env
+```
+*(On Windows PowerShell: `Copy-Item .env.example .env`)*
+
+| Variable | Default Value | Description |
+| :--- | :--- | :--- |
+| `FALKORDB_HOST` | `localhost` | FalkorDB server host address |
+| `FALKORDB_PORT` | `6379` | FalkorDB Redis-compatible port |
+| `PRIMARY_GRAPH` | `graphsre_production` | Primary production graph key |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | Backend API base URL for frontend |
+| `NEXT_PUBLIC_WS_URL` | `ws://localhost:8000` | WebSocket endpoint for real-time updates |
+| `OPENAI_API_KEY` | `mock-openai-key` | Optional LLM provider key |
+| `GROQ_API_KEY` | `mock-groq-key` | Optional Groq LLM key |
+
+#### 3. Backend Setup (Python)
+```bash
+# Create and activate virtual environment
 python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+source .venv/bin/activate       # Windows PowerShell: .venv\Scripts\Activate.ps1
+
+# Install dependencies
 pip install -r requirements.txt
 
-# 3. Seed knowledge graph
+# Seed FalkorDB knowledge graph, AST call hierarchies, and HNSW vector index
 python scripts/seed_mock_topology.py
 
-# 4. Start backend & frontend
-uvicorn backend.main:app --reload --port 8000 &
-cd frontend && npm install && npm run dev
+# Launch FastAPI backend with WebSocket support
+uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+#### 4. FastMCP Tool Server (Optional for Agent Workflows)
+```bash
+python server/mcp_server.py
+```
+
+#### 5. Frontend Setup (Next.js 14)
+In a separate terminal:
+```bash
+cd frontend
+npm install
+npm run dev
+```
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+---
+
+### 🧪 Verifying the Installation
+
+Run the complete test suite to ensure FalkorDB connectivity, graph invariants, and lifecycle engines are operational:
+
+```bash
+# Run unit and invariant tests
+python -m unittest tests/test_graph_invariants.py tests/test_fsm_lifecycle.py tests/test_docker_cicd.py
+
+# Run standalone end-to-end incident lifecycle test (< 90s MTTR SLA)
+python tests/test_e2e_lifecycle.py
+
+# Run interactive CLI incident simulation
+python scripts/run_demo_simulation.py
 ```
 
 ---
@@ -531,3 +595,8 @@ python tests/test_graph_invariants.py
 # Run interactive CLI demonstration
 python scripts/run_demo_simulation.py
 ```
+
+---
+
+## 📄 License
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
