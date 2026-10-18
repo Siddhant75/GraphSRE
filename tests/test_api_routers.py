@@ -211,6 +211,48 @@ def test_copilot_natural_language_query():
     assert len(data["results"]) > 0
 
 
+def test_cicd_blast_gate_ast_parsing_and_subgraph():
+    """Verify POST /api/cicd/blast-gate parses Python AST functions and returns Cytoscape subgraph."""
+    code_diff = """
+def process_charge(card_token: str, amount: float):
+    # Charge through stripe gateway
+    return execute_stripe_charge(amount)
+"""
+    payload = {
+        "pr_number": 510,
+        "repo_url": "https://github.com/company/payment-service",
+        "changed_files": ["services/payment/gateway.py"],
+        "diff_patch": code_diff
+    }
+    response = client.post("/api/cicd/blast-gate", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["pr_number"] == 510
+    assert "verdict" in data
+    assert data["structural_risk_index"] > 0.0
+    assert "cytoscape_subgraph" in data
+    subgraph = data["cytoscape_subgraph"]
+    assert "nodes" in subgraph and len(subgraph["nodes"]) > 0
+    assert "edges" in subgraph
+
+
+def test_cicd_blast_gate_safe_pr():
+    """Verify POST /api/cicd/blast-gate passes non-critical PR without policy violation."""
+    payload = {
+        "pr_number": 511,
+        "repo_url": "https://github.com/company/notification-service",
+        "changed_files": ["services/notification/mailer.py"],
+        "diff_patch": "# minor comments update"
+    }
+    response = client.post("/api/cicd/blast-gate", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["pr_number"] == 511
+    assert data["verdict"] == "PASSED"
+    assert data["structural_risk_index"] == 0.15
+    assert data["blast_radius_count"] == 0
+
+
 if __name__ == "__main__":
     tests = [
         ("test_health_check_endpoint", test_health_check_endpoint),
@@ -221,6 +263,8 @@ if __name__ == "__main__":
         ("test_simulate_remediation_endpoint", test_simulate_remediation_endpoint),
         ("test_chaos_inject_and_scenarios", test_chaos_inject_and_scenarios),
         ("test_cicd_blast_gate_evaluation", test_cicd_blast_gate_evaluation),
+        ("test_cicd_blast_gate_ast_parsing_and_subgraph", test_cicd_blast_gate_ast_parsing_and_subgraph),
+        ("test_cicd_blast_gate_safe_pr", test_cicd_blast_gate_safe_pr),
         ("test_copilot_natural_language_query", test_copilot_natural_language_query),
     ]
 

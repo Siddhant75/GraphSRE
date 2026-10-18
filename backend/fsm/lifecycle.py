@@ -34,11 +34,11 @@ class IncidentLifecycleFSM:
 
     VALID_TRANSITIONS: Dict[IncidentState, Set[IncidentState]] = {
         IncidentState.DETECTED: {IncidentState.TRIAGED},
-        IncidentState.TRIAGED: {IncidentState.INVESTIGATING},
-        IncidentState.INVESTIGATING: {IncidentState.HYPOTHESIS_FORMED},
-        IncidentState.HYPOTHESIS_FORMED: {IncidentState.CONSENSUS_REACHED, IncidentState.INVESTIGATING},
-        IncidentState.CONSENSUS_REACHED: {IncidentState.SANDBOX_SIMULATED, IncidentState.REMEDIATING},
-        IncidentState.SANDBOX_SIMULATED: {IncidentState.REMEDIATING, IncidentState.INVESTIGATING},
+        IncidentState.TRIAGED: {IncidentState.INVESTIGATING, IncidentState.HYPOTHESIS_FORMED, IncidentState.RESOLVED},
+        IncidentState.INVESTIGATING: {IncidentState.HYPOTHESIS_FORMED, IncidentState.RESOLVED},
+        IncidentState.HYPOTHESIS_FORMED: {IncidentState.CONSENSUS_REACHED, IncidentState.INVESTIGATING, IncidentState.REMEDIATING},
+        IncidentState.CONSENSUS_REACHED: {IncidentState.SANDBOX_SIMULATED, IncidentState.REMEDIATING, IncidentState.RESOLVED},
+        IncidentState.SANDBOX_SIMULATED: {IncidentState.REMEDIATING, IncidentState.INVESTIGATING, IncidentState.RESOLVED},
         IncidentState.REMEDIATING: {IncidentState.RESOLVED, IncidentState.INVESTIGATING},
         IncidentState.RESOLVED: set()
     }

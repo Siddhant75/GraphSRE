@@ -27,6 +27,9 @@ class TriageAlertResponse(BaseModel):
     blast_radius_count: Optional[int] = None
     impacted_services: List[str]
     sev_score: float
+    shortcut_hit: Optional[bool] = False
+    shortcut_target: Optional[str] = None
+    mttr_seconds: Optional[int] = None
 
     def __init__(self, **kwargs):
         if "blast_radius_count" not in kwargs and "blast_radius" in kwargs:
@@ -77,6 +80,7 @@ class RemediateIncidentRequest(BaseModel):
     target_commit: Optional[str] = None
     target_service: Optional[str] = None
     simulate_sandbox: bool = True
+    composite_confidence: Optional[float] = None
 
 
 class RemediateIncidentResponse(BaseModel):
